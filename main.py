@@ -225,7 +225,7 @@ def cmd_start(message: types.Message):
 
     bot.send_message(
         message.chat.id,
-        "👑 *KOROLKO — украшения ручной работы*\n\n"
+        "👑 *KOROLKO — HandWork jewelry*\n\n"
         "Добро пожаловать в KOROLKO! Браслеты, брелки и другие авторские "
         "украшения ручной работы.\n\n"
         "Нажмите кнопку ниже, чтобы открыть каталог товаров, проверить наличие и оформить заказ.",
