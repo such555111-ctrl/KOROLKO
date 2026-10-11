@@ -36,6 +36,10 @@ def bead_art_image(kind):
 
 def setup_madebar(app, bot, admin_chat_ids, require_admin, upload_dir):
     """Конструктор не должен ронять весь магазин: любая ошибка только логируется."""
+    # Страница и картинки не зависят от базы: конструктор открывается всегда,
+    # а при проблемах с БД покажет понятную ошибку вместо 404.
+    app.register_blueprint(page_bp)
+
     try:
         from models import init_db
         from bead_api import register_bead_api
@@ -53,5 +57,4 @@ def setup_madebar(app, bot, admin_chat_ids, require_admin, upload_dir):
 
     register_bead_api(app, bot, admin_chat_ids)
     register_bead_admin(app, require_admin, upload_dir)
-    app.register_blueprint(page_bp)
     log.info("Made Bar подключён")
