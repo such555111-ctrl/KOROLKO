@@ -414,6 +414,8 @@
 .mb-order ol{margin:6px 0 0;padding-left:22px;line-height:1.7;color:var(--text);}
 .mb-order__total{margin-top:10px;font-weight:800;font-family:var(--font-heading);color:var(--accent);font-size:17px;}
 .mb-order .mb-actions{margin-top:10px;}
+
+.mb-fail{margin:12px 0;padding:14px 16px;border-radius:14px;background:rgba(255,107,107,.1);border:1.5px solid var(--danger);color:var(--danger);font-size:13px;line-height:1.55;overflow-wrap:anywhere;}
 </style></style>
 </head>
 <body>
@@ -1354,13 +1356,27 @@ function updateAddBtn(){
   document.getElementById('addBtn').style.display = show ? 'flex' : 'none';
 }
 
+let mbError = '';
+
 async function loadMadeBar(){
-  if (mbView === 'beads'){
-    const r = await api('/api/admin/beads');
-    beads = r.beads;
-    beadCategories = r.categories;
-  } else {
-    mbOrders = await api('/api/admin/custom-orders');
+  mbError = '';
+  try {
+    if (mbView === 'beads'){
+      const r = await api('/api/admin/beads');
+      beads = r.beads;
+      beadCategories = r.categories;
+    } else {
+      mbOrders = await api('/api/admin/custom-orders');
+    }
+  } catch(e){
+    // выясняем, почему Made Bar не отвечает
+    try {
+      const st = await api('/api/admin/madebar-status');
+      mbError = st.error || e.message;
+    } catch(_){
+      mbError = 'Сервер не знает Made Bar. Проверьте, что на GitHub залиты все файлы (в том числе main.py) и что деплой на Render прошёл успешно.';
+    }
+    throw e;
   }
 }
 
@@ -1371,7 +1387,9 @@ function renderMadeBar(){
       <button data-mbview="beads" class="${mbView === 'beads' ? 'active' : ''}">Бусины</button>
       <button data-mbview="orders" class="${mbView === 'orders' ? 'active' : ''}">Заказы сборок</button>
     </div>`;
-  list.innerHTML = sw + (mbView === 'beads' ? beadsHTML() : mbOrdersHTML());
+  const fail = mbError
+    ? `<div class="mb-fail"><b>Made Bar не запустился</b><br>${escB(mbError)}</div>` : '';
+  list.innerHTML = sw + fail + (mbView === 'beads' ? beadsHTML() : mbOrdersHTML());
 
   list.querySelectorAll('[data-mbview]').forEach(b => b.onclick = async () => {
     if (b.dataset.mbview === mbView) return;
