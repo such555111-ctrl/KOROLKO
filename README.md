@@ -26,7 +26,6 @@ seed_beads.py     — стартовый каталог (55 бусин), соз�
 models.py         — модели базы данных (SQLAlchemy): Bead, CustomOrder
 madebar_config.py — настройки Made Bar: цена основы, лимит бусин
 requirements.txt  — python-зависимости
-.python-version   — версия Python для Render (3.12)
 Procfile          — команда запуска для Render
 render.yaml       — опциональный blueprint для Render
 ```
@@ -178,8 +177,9 @@ Made Bar хранит бусины и заказы в базе данных, а 
 - **«Ошибка базы данных»** — проверьте `DATABASE_URL` (нужен *Internal Database URL*
   вашей PostgreSQL, без кавычек и пробелов).
 
-Файл `.python-version` закрепляет Python 3.12 на Render: зависимости проекта
-проверены под эту версию.
+- **`TypeError: descriptor '__getitem__' requires a 'typing.Union'…`** — старая
+  версия SQLAlchemy на новом Python. В `requirements.txt` должны стоять
+  `SQLAlchemy>=2.0.44,<2.1` и `psycopg2-binary>=2.9.11` (как в архиве).
 
 ### Настройки (необязательно)
 
