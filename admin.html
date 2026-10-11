@@ -383,14 +383,20 @@
 .sw input:checked + .sw-track::after{transform:translateX(16px);}
 .sw input:focus-visible + .sw-track{outline:2px solid var(--accent);outline-offset:2px;}
 
-.bead-drop{
-  position:relative;width:132px;height:132px;margin:0 auto;border-radius:18px;cursor:pointer;overflow:hidden;
-  border:1.5px dashed var(--muted-dim);display:grid;place-items:center;
-  background:repeating-conic-gradient(#f3e3ea 0% 25%,#fff 0% 50%) 50% / 14px 14px;
+.bead-stage{
+  width:132px;height:132px;margin:6px auto 0;border-radius:20px;display:grid;place-items:center;
+  background:repeating-conic-gradient(#f3e3ea 0% 25%,#fff 0% 50%) 50% / 14px 14px;border:1.5px solid var(--line);
 }
-.bead-drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;}
-.bead-drop span{position:relative;font-size:11px;color:var(--muted);text-align:center;padding:4px 10px;background:rgba(255,255,255,.88);border-radius:8px;}
-.bead-drop.has-img span{display:none;}
+.bead-stage img{width:96px;height:96px;object-fit:contain;filter:drop-shadow(0 4px 5px rgba(120,40,70,.3));}
+.bd-swatches{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;}
+.bd-sw{
+  width:32px;height:32px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 0 1.5px var(--line);
+  cursor:pointer;padding:0;transition:transform .15s var(--ease),box-shadow .15s;
+}
+.bd-sw:active{transform:scale(.85);}
+.bd-sw.active{box-shadow:0 0 0 2.5px var(--accent);transform:scale(1.1);}
+.color-row{display:flex;align-items:center;gap:12px;margin-top:12px;}
+.color-row input{width:56px;height:40px;padding:2px;border-radius:10px;flex:0 0 auto;cursor:pointer;}
 .mb-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
 /* заказы Made Bar */
@@ -554,15 +560,28 @@
     <div class="modal-title" id="beadModalTitle">Новая бусина</div>
     <div class="muted" id="beadModalSub">прозрачный PNG, лучше квадратный</div>
 
-    <label>Картинка бусины</label>
-    <div class="bead-drop" id="beadDrop">
-      <img id="beadPreview" alt="" style="display:none;">
-      <span>Нажмите, чтобы загрузить PNG</span>
-    </div>
-    <input type="file" id="beadFile" accept="image/png,image/webp" style="display:none;">
+    <div class="bead-stage"><img id="beadPreview" alt=""></div>
+    <div class="muted" id="beadCustomNote" style="text-align:center;margin-top:8px;display:none;">Сейчас стоит загруженная картинка. Выберите вид или цвет ниже, чтобы заменить её.</div>
 
-    <label>или ссылка на картинку <span class="muted" style="text-transform:none;letter-spacing:0;">— только https://</span></label>
-    <input type="url" id="beadUrl" placeholder="https://example.com/bead.png">
+    <label>Вид</label>
+    <div class="badge-picker" id="beadKindPicker"></div>
+
+    <div id="beadVariantWrap">
+      <label>Фактура</label>
+      <div class="badge-picker" id="beadVariantPicker"></div>
+    </div>
+
+    <div id="beadLetterWrap" style="display:none;">
+      <label>Буква</label>
+      <input type="text" id="bLetter" maxlength="1" placeholder="А">
+    </div>
+
+    <label>Цвет</label>
+    <div class="bd-swatches" id="beadSwatches"></div>
+    <div class="color-row">
+      <input type="color" id="beadColor" value="#9a6bd1" aria-label="Любой цвет">
+      <span class="muted">или выберите любой цвет</span>
+    </div>
 
     <label>Название</label>
     <input type="text" id="bName" maxlength="120" placeholder="Жемчуг барочный">
@@ -1324,7 +1343,6 @@ let mbOrders = [];
 let editingBeadId = null;
 let beadAvailable = true;
 let beadExistingUrl = '';
-let beadFileObj = null;
 
 const escB = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1438,20 +1456,101 @@ async function deleteBead(id){
   } catch(e){ showToast(e.message); }
 }
 
-// ----- Модалка бусины -----
-const $beadOverlay = document.getElementById('beadOverlay');
-const $beadDrop = document.getElementById('beadDrop');
-const $beadPreview = document.getElementById('beadPreview');
-const $beadFile = document.getElementById('beadFile');
-const $beadUrl = document.getElementById('beadUrl');
-const $bCategory = document.getElementById('bCategory');
+// ----- Модалка бусины: вид, фактура и цвет вместо загрузки картинки -----
+const BEAD_KINDS = {
+  gem:    { label:'Камень',   color:'9a6bd1', variants:{ plain:'Гладкий', sheen:'Сияющий', banded:'Полосатый', stripes:'Шёлковый', flecks:'Крапинки', veins:'Прожилки' } },
+  pearl:  { label:'Жемчуг',   color:'f4ece1', variants:{ round:'Круглый', baroque:'Барочный' } },
+  metal:  { label:'Металл',   color:'c9ced6', variants:{ shiny:'Глянец', matte:'Матовый' } },
+  ring:   { label:'Кольцо',   color:'c9ced6', variants:{} },
+  letter: { label:'Буква',    color:'fff4f7', variants:{} },
+  charm:  { label:'Подвеска', color:'c9ced6', variants:{ heart:'Сердце', star:'Звезда', moon:'Луна', flower:'Цветок' } },
+};
+const BEAD_SWATCHES = ['f08db0','d9608a','d94452','f0a35e','f1d58a','a8d672','2f8f5b','3fb7b0',
+  '4a8dc4','2a4fa8','9a6bd1','cdb4f0','fdf7f2','2b2b30','c9ced6','e0b45c','8a5a3a'];
 
-function setBeadPreview(src){
-  if (src){ $beadPreview.src = src; $beadPreview.style.display = 'block'; }
-  else { $beadPreview.removeAttribute('src'); $beadPreview.style.display = 'none'; }
-  $beadDrop.classList.toggle('has-img', !!src);
+let beadKind = 'gem', beadVariant = 'plain', beadColor = '9a6bd1', beadLetter = '';
+let beadUseArt = true;     // false: у редактируемой бусины стоит старая загруженная картинка
+
+const $beadOverlay = document.getElementById('beadOverlay');
+const $beadPreview = document.getElementById('beadPreview');
+const $bCategory = document.getElementById('bCategory');
+const $bName = document.getElementById('bName');
+const $bLetter = document.getElementById('bLetter');
+const $beadColor = document.getElementById('beadColor');
+
+function beadArtUrl(){
+  const p = new URLSearchParams();
+  p.set('c', beadColor);
+  if (beadVariant) p.set('v', beadVariant);
+  if (beadKind === 'letter') p.set('t', beadLetter || 'А');
+  return `/beadart/${beadKind}.svg?${p.toString()}`;
 }
-$beadPreview.onerror = () => setBeadPreview('');
+
+// разбираем ссылку вида /beadart/gem.svg?c=9a6bd1&v=sheen, чтобы показать её в форме
+function parseArtUrl(url){
+  if (!url || !url.startsWith('/beadart/')) return false;
+  try {
+    const u = new URL(url, location.origin);
+    const kind = u.pathname.split('/').pop().replace('.svg', '');
+    if (!BEAD_KINDS[kind]) return false;
+    beadKind = kind;
+    beadColor = (u.searchParams.get('c') || BEAD_KINDS[kind].color).replace('#', '').toLowerCase();
+    const v = u.searchParams.get('v');
+    beadVariant = BEAD_KINDS[kind].variants[v] ? v : Object.keys(BEAD_KINDS[kind].variants)[0] || '';
+    beadLetter = u.searchParams.get('t') || '';
+    return true;
+  } catch(e){ return false; }
+}
+
+function renderBeadBuilder(){
+  document.getElementById('beadKindPicker').innerHTML = Object.entries(BEAD_KINDS).map(([k, d]) =>
+    `<button type="button" class="badge-opt ${k === beadKind ? 'active' : ''}" data-kind="${k}">${d.label}</button>`).join('');
+
+  const variants = BEAD_KINDS[beadKind].variants;
+  const keys = Object.keys(variants);
+  document.getElementById('beadVariantWrap').style.display = keys.length ? '' : 'none';
+  document.getElementById('beadVariantPicker').innerHTML = keys.map(k =>
+    `<button type="button" class="badge-opt ${k === beadVariant ? 'active' : ''}" data-variant="${k}">${variants[k]}</button>`).join('');
+
+  document.getElementById('beadLetterWrap').style.display = beadKind === 'letter' ? '' : 'none';
+  $bLetter.value = beadLetter;
+
+  document.getElementById('beadSwatches').innerHTML = BEAD_SWATCHES.map(c =>
+    `<button type="button" class="bd-sw ${c === beadColor ? 'active' : ''}" data-color="${c}" style="background:#${c}" aria-label="#${c}"></button>`).join('');
+  $beadColor.value = '#' + beadColor;
+
+  $beadPreview.src = beadUseArt ? beadArtUrl() : beadExistingUrl;
+  document.getElementById('beadCustomNote').style.display = beadUseArt ? 'none' : '';
+
+  document.querySelectorAll('#beadKindPicker [data-kind]').forEach(b => b.onclick = () => {
+    const wasDefault = beadColor === BEAD_KINDS[beadKind].color;
+    beadKind = b.dataset.kind;
+    beadVariant = Object.keys(BEAD_KINDS[beadKind].variants)[0] || '';
+    if (wasDefault) beadColor = BEAD_KINDS[beadKind].color;     // цвет по умолчанию подстраивается под вид
+    beadUseArt = true;
+    renderBeadBuilder();
+  });
+  document.querySelectorAll('#beadVariantPicker [data-variant]').forEach(b => b.onclick = () => {
+    beadVariant = b.dataset.variant; beadUseArt = true; renderBeadBuilder();
+  });
+  document.querySelectorAll('#beadSwatches [data-color]').forEach(b => b.onclick = () => {
+    beadColor = b.dataset.color; beadUseArt = true; renderBeadBuilder();
+  });
+}
+$beadColor.addEventListener('input', () => {
+  beadColor = $beadColor.value.replace('#', '').toLowerCase();
+  beadUseArt = true;
+  $beadPreview.src = beadArtUrl();
+  document.getElementById('beadCustomNote').style.display = 'none';
+  document.querySelectorAll('#beadSwatches .bd-sw').forEach(s => s.classList.toggle('active', s.dataset.color === beadColor));
+});
+$bLetter.addEventListener('input', () => {
+  beadLetter = $bLetter.value.trim().slice(0, 1).toUpperCase();
+  $bLetter.value = beadLetter;
+  beadUseArt = true;
+  if (beadLetter && (!$bName.value.trim() || $bName.value.startsWith('Буква '))) $bName.value = 'Буква ' + beadLetter;
+  $beadPreview.src = beadArtUrl();
+});
 
 function renderBeadCatChips(){
   const cur = $bCategory.value.trim();
@@ -1474,18 +1573,20 @@ function openBeadModal(id){
   const b = id ? beads.find(x => x.id === id) : null;
   document.getElementById('beadFormError').textContent = '';
   document.getElementById('beadModalTitle').textContent = b ? 'Изменить бусину' : 'Новая бусина';
-  document.getElementById('beadModalSub').textContent = b ? b.name : 'прозрачный PNG, лучше квадратный';
-  document.getElementById('bName').value = b?.name || '';
+  document.getElementById('beadModalSub').textContent = b ? b.name : 'выберите вид и цвет, бусина нарисуется сама';
+  $bName.value = b?.name || '';
   $bCategory.value = b?.category || '';
   document.getElementById('bPrice').value = b?.price ?? '';
   document.getElementById('bSize').value = b?.size_mm ?? 8;
   document.getElementById('bSort').value = b?.sort_order ?? '';
-  $beadUrl.value = '';
-  $beadFile.value = '';
-  beadFileObj = null;
+
+  // состояние конструктора бусины
+  beadKind = 'gem'; beadVariant = 'plain'; beadColor = BEAD_KINDS.gem.color; beadLetter = '';
   beadExistingUrl = b?.image_url || '';
-  setBeadPreview(beadExistingUrl);
+  beadUseArt = !b || parseArtUrl(beadExistingUrl);   // загруженную картинку оставляем, пока не тронут вид/цвет
+
   beadAvailable = b ? b.is_active : true;
+  renderBeadBuilder();
   renderBeadActivePicker();
   renderBeadCatChips();
   $beadOverlay.classList.add('open');
@@ -1493,58 +1594,29 @@ function openBeadModal(id){
 function closeBeadModal(){ $beadOverlay.classList.remove('open'); }
 document.getElementById('beadCancelBtn').onclick = closeBeadModal;
 $beadOverlay.addEventListener('click', e => { if (e.target.id === 'beadOverlay') closeBeadModal(); });
-$beadDrop.onclick = () => $beadFile.click();
-
-$beadFile.onchange = () => {
-  const f = $beadFile.files[0];
-  const err = document.getElementById('beadFormError');
-  err.textContent = '';
-  if (!f) return;
-  if (!['image/png', 'image/webp'].includes(f.type)){ err.textContent = 'Нужен PNG (или WebP) с прозрачным фоном'; $beadFile.value = ''; return; }
-  if (f.size > 2 * 1024 * 1024){ err.textContent = 'Файл больше 2 МБ'; $beadFile.value = ''; return; }
-  beadFileObj = f;
-  setBeadPreview(URL.createObjectURL(f));
-};
-$beadUrl.addEventListener('input', () => {
-  const v = $beadUrl.value.trim();
-  if (v.startsWith('https://')) setBeadPreview(v);
-  else if (!v) setBeadPreview(beadFileObj ? $beadPreview.src : beadExistingUrl);
-});
-
-async function uploadBeadFile(file){
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch('/api/admin/beads/upload', { method:'POST', headers:{ 'X-Admin-Password': pwd }, body: fd });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(j.error || 'Не удалось загрузить файл (возможно, он больше 2 МБ)');
-  return j.url;
-}
 
 document.getElementById('beadSaveBtn').onclick = async () => {
   const err = document.getElementById('beadFormError');
   err.textContent = '';
-  const name = document.getElementById('bName').value.trim();
+  const name = $bName.value.trim();
   const category = $bCategory.value.trim();
   const price = parseFloat(document.getElementById('bPrice').value.replace(',', '.'));
   const size = parseFloat(document.getElementById('bSize').value.replace(',', '.'));
   const sort = document.getElementById('bSort').value.trim();
-  const typedUrl = $beadUrl.value.trim();
 
-  if (!name){ err.textContent = 'Введите название'; return; }
+  if (!name){ err.textContent = 'Введите название: оно покажется под бусиной'; return; }
   if (!category){ err.textContent = 'Укажите категорию'; return; }
+  if (beadUseArt && beadKind === 'letter' && !beadLetter){ err.textContent = 'Введите букву'; return; }
   if (!Number.isFinite(price) || price < 0){ err.textContent = 'Укажите цену (0 или больше)'; return; }
   if (!Number.isFinite(size) || size < 1 || size > 30){ err.textContent = 'Размер: от 1 до 30 мм'; return; }
-  if (typedUrl && !typedUrl.startsWith('https://')){ err.textContent = 'Ссылка должна начинаться с https://'; return; }
-  if (!beadFileObj && !typedUrl && !beadExistingUrl){ err.textContent = 'Добавьте картинку'; return; }
 
   const btn = document.getElementById('beadSaveBtn');
   btn.disabled = true; btn.textContent = 'Сохраняем…';
   try {
-    let image_url = beadExistingUrl;                 // приоритет: новый файл > ссылка > прежняя картинка
-    if (beadFileObj) image_url = await uploadBeadFile(beadFileObj);
-    else if (typedUrl) image_url = typedUrl;
-
-    const payload = { name, category, price, size_mm: size, image_url, is_active: beadAvailable };
+    const payload = {
+      name, category, price, size_mm: size, is_active: beadAvailable,
+      image_url: beadUseArt ? beadArtUrl() : beadExistingUrl,
+    };
     if (sort !== '') payload.sort_order = Number(sort);
 
     await api(editingBeadId ? `/api/admin/beads/${editingBeadId}` : '/api/admin/beads', {
