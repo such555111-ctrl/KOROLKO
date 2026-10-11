@@ -14,6 +14,15 @@ services:
         sync: false
       - key: ADMIN_CHAT_ID
         sync: false
+      # Made Bar: строка подключения к PostgreSQL (см. README, раздел «Made Bar»).
+      # Без неё заказы сборок хранятся во временном SQLite-файле и пропадают при деплое.
+      - key: DATABASE_URL
+        sync: false
+      # Необязательно: стоимость основы (шнурок + застёжка), ₽, и лимит бусин на нити.
+      - key: MADEBAR_BASE_PRICE
+        value: "700"
+      - key: MADEBAR_MAX_BEADS
+        value: "30"
     # Опционально: платный постоянный диск, чтобы товары и загруженные фото
     # не пропадали при рестарте/редеплое (см. README, раздел "Постоянное хранилище").
     # disk:

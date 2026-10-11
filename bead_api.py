@@ -1,0 +1,248 @@
+"""Публичный API конструктора Made Bar (то, что вызывает мини-апп)."""
+import html
+import json
+import logging
+import time
+from collections import Counter, defaultdict, deque
+
+from flask import Blueprint, Response, jsonify, request
+from sqlalchemy import select
+
+from madebar_config import (
+    BASE_PRICE, MAX_BEADS, RATE_LIMIT_ORDERS, RATE_LIMIT_WINDOW_SEC,
+)
+from models import Bead, CustomOrder, SessionLocal
+
+log = logging.getLogger("korolko.beadbar")
+
+bead_bp = Blueprint("bead_api", __name__)
+
+ALLOWED_DELIVERY = {"Доставка", "Самовывоз"}
+PRICE_TOLERANCE = 0.01   # допустимое расхождение цены клиента и сервера
+
+_bot = None
+_admin_chat_ids: set = set()
+_hits = defaultdict(deque)   # ip -> метки времени последних заказов
+
+
+# --- Вспомогательные функции -------------------------------------------
+
+def _error(message: str, status: int = 400):
+    return jsonify({"ok": False, "error": message}), status
+
+
+def _client_ip() -> str:
+    fwd = request.headers.get("X-Forwarded-For", "")
+    return (fwd.split(",")[0].strip() or request.remote_addr or "?")
+
+
+def _rate_limited() -> bool:
+    now = time.monotonic()
+    q = _hits[_client_ip()]
+    while q and now - q[0] > RATE_LIMIT_WINDOW_SEC:
+        q.popleft()
+    if len(q) >= RATE_LIMIT_ORDERS:
+        return True
+    q.append(now)
+    return False
+
+
+def _clean_phone(raw: str):
+    """Оставляет цифры и ведущий '+', проверяет длину 10-15 цифр."""
+    raw = (raw or "").strip()
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if not 10 <= len(digits) <= 15:
+        return None
+    return ("+" if raw.startswith("+") else "") + digits
+
+
+def _fmt_num(x: float) -> str:
+    return f"{x:.2f}".rstrip("0").rstrip(".")
+
+
+def _validate_order(data: dict):
+    """Возвращает (clean_dict, error_message)."""
+    name = str(data.get("customer_name") or "").strip()
+    if not 2 <= len(name) <= 120:
+        return None, "Укажите имя (от 2 до 120 символов)"
+
+    phone = _clean_phone(str(data.get("customer_phone") or ""))
+    if not phone:
+        return None, "Некорректный номер телефона"
+
+    delivery = str(data.get("delivery_type") or "").strip()
+    if delivery not in ALLOWED_DELIVERY:
+        return None, "delivery_type должен быть «Доставка» или «Самовывоз»"
+
+    address = str(data.get("address") or "").strip() or None
+    if delivery == "Доставка":
+        if not address or len(address) < 5:
+            return None, "Для доставки нужно указать адрес"
+    else:
+        address = None
+    if address and len(address) > 500:
+        return None, "Адрес слишком длинный"
+
+    comment = str(data.get("comment") or "").strip() or None
+    if comment and len(comment) > 500:
+        return None, "Комментарий слишком длинный"
+
+    ids = data.get("beads_ids")
+    if not isinstance(ids, list) or not ids:
+        return None, "Украшение пустое: добавьте хотя бы одну бусину"
+    if len(ids) > MAX_BEADS:
+        return None, f"Слишком много бусин (максимум {MAX_BEADS})"
+    # bool является подклассом int, его отсекаем отдельно
+    if not all(isinstance(i, int) and not isinstance(i, bool) and i > 0 for i in ids):
+        return None, "beads_ids должен быть массивом положительных целых чисел"
+
+    try:
+        client_total = float(data.get("total_price"))
+    except (TypeError, ValueError):
+        return None, "Некорректная total_price"
+
+    return {
+        "customer_name": name, "customer_phone": phone, "delivery_type": delivery,
+        "address": address, "comment": comment, "beads_ids": ids,
+        "client_total": client_total,
+    }, None
+
+
+def _build_recipe(order: CustomOrder, beads_by_id: dict) -> str:
+    """Текстовый рецепт сборки для админа (HTML для Telegram)."""
+    esc = html.escape
+    seq = order.beads_sequence
+    total_mm = sum(beads_by_id[i].size_mm for i in seq)
+
+    lines = [
+        f"🧵 <b>Новый заказ Made Bar #{order.id}</b>",
+        "",
+        f"👤 {esc(order.customer_name)}",
+        f"📞 {esc(order.customer_phone)}",
+        f"🚚 {esc(order.delivery_type)}",
+    ]
+    if order.address:
+        lines.append(f"📍 {esc(order.address)}")
+    if order.comment:
+        lines.append(f"💬 {esc(order.comment)}")
+
+    lines += ["", f"<b>Рецепт сборки</b> (слева направо, {len(seq)} шт., бусины ≈ {total_mm / 10:.1f} см):"]
+    for pos, bead_id in enumerate(seq, start=1):
+        b = beads_by_id[bead_id]
+        lines.append(f"{pos}. {esc(b.name)} <i>({_fmt_num(b.size_mm)} мм, {esc(b.category)})</i>")
+
+    lines += ["", "<b>Закупка по позициям:</b>"]
+    for bead_id, qty in Counter(seq).items():
+        b = beads_by_id[bead_id]
+        lines.append(f"• {esc(b.name)} × {qty} = {_fmt_num(b.price * qty)} ₽")
+    lines.append(f"• Основа (шнурок + застёжка) = {_fmt_num(BASE_PRICE)} ₽")
+
+    lines += ["", f"💰 <b>Итого: {_fmt_num(order.total_price)} ₽</b>"]
+    return "\n".join(lines)
+
+
+def _notify_admins(text: str) -> None:
+    """Отправка в Telegram. Ошибки не должны ломать оформление заказа."""
+    if _bot is None or not _admin_chat_ids:
+        log.warning("ADMIN_CHAT_ID не задан, уведомление не отправлено")
+        return
+    for chat_id in _admin_chat_ids:
+        try:
+            _bot.send_message(chat_id, text, parse_mode="HTML")
+        except Exception:
+            log.exception("Не удалось отправить уведомление админу %s", chat_id)
+
+
+# --- Эндпоинты ----------------------------------------------------------
+
+@bead_bp.route("/api/madebar/config", methods=["GET"])
+def get_config():
+    resp = jsonify({"base_price": BASE_PRICE, "max_beads": MAX_BEADS})
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@bead_bp.route("/api/beads", methods=["GET"])
+def get_beads():
+    session = SessionLocal()
+    rows = session.scalars(
+        select(Bead).where(Bead.is_active.is_(True)).order_by(Bead.sort_order, Bead.id)
+    ).all()
+
+    grouped: dict = {}
+    for b in rows:
+        grouped.setdefault(b.category, []).append({
+            "id": b.id, "name": b.name, "category": b.category,
+            "image_url": b.image_url, "price": b.price, "size_mm": b.size_mm,
+        })
+    # Не через jsonify: он сортирует ключи по алфавиту, а нам нужен порядок категорий
+    # по sort_order (иначе табы в конструкторе встанут в алфавитном порядке).
+    resp = Response(json.dumps(grouped, ensure_ascii=False), mimetype="application/json")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@bead_bp.route("/api/orders/custom", methods=["POST"])
+def create_custom_order():
+    if _rate_limited():
+        return _error("Слишком много заказов с вашего адреса. Попробуйте чуть позже.", 429)
+
+    data = request.get_json(force=True, silent=True)
+    if not isinstance(data, dict):
+        return _error("Ожидался JSON-объект")
+
+    clean, err = _validate_order(data)
+    if err:
+        return _error(err)
+
+    session = SessionLocal()
+    ids = clean["beads_ids"]
+
+    beads = session.scalars(
+        select(Bead).where(Bead.id.in_(set(ids)), Bead.is_active.is_(True))
+    ).all()
+    beads_by_id = {b.id: b for b in beads}
+
+    missing = sorted(set(ids) - set(beads_by_id))
+    if missing:
+        return _error("Некоторые бусины закончились или были убраны. Обновите конструктор.")
+
+    # Цену считаем на сервере: клиенту доверять нельзя
+    server_total = round(BASE_PRICE + sum(beads_by_id[i].price for i in ids), 2)
+    if abs(server_total - clean["client_total"]) > PRICE_TOLERANCE:
+        log.warning("Расхождение цены: клиент=%s, сервер=%s", clean["client_total"], server_total)
+        return _error(
+            f"Цены обновились, актуальная сумма: {_fmt_num(server_total)} ₽. "
+            "Проверьте заказ и отправьте ещё раз.",
+            status=409,
+        )
+
+    order = CustomOrder(
+        customer_name=clean["customer_name"], customer_phone=clean["customer_phone"],
+        delivery_type=clean["delivery_type"], address=clean["address"],
+        comment=clean["comment"], beads_sequence=ids, total_price=server_total,
+        status="new",
+    )
+    try:
+        session.add(order)
+        session.commit()
+    except Exception:
+        session.rollback()
+        log.exception("Ошибка сохранения заказа")
+        return _error("Не удалось сохранить заказ", 500)
+
+    _notify_admins(_build_recipe(order, beads_by_id))
+    return jsonify({"ok": True, "order_id": order.id, "total_price": server_total}), 201
+
+
+# --- Подключение --------------------------------------------------------
+
+def register_bead_api(app, bot, admin_chat_ids):
+    global _bot, _admin_chat_ids
+    _bot = bot
+    _admin_chat_ids = set(admin_chat_ids)
+    app.register_blueprint(bead_bp)
+
+    @app.teardown_appcontext
+    def _shutdown_session(exc=None):
+        SessionLocal.remove()

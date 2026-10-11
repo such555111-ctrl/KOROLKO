@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFF6F8">
+<title>Made Bar · KOROLKO</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFF6F8; --card:#FFFFFF; --card-hover:#FFEEF3;
+    --accent:#D9608A; --accent-hover:#C2476F; --accent-soft:#F08DB0;
+    --accent-dim:rgba(217,96,138,.12);
+    --text:#4A2C3A; --muted:#8F6677; --muted-dim:#C9A9B6;
+    --line:#F6D9E3; --danger:#E5535B; --ok:#3FAE5A;
+    --font-heading:'Playfair Display',Georgia,serif;
+    --font-body:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --ease:cubic-bezier(.22,1,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
+    --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  [hidden]{display:none !important;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.35;
+    overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none;
+    -webkit-font-smoothing:antialiased;
+  }
+  input,textarea{-webkit-user-select:text;user-select:text;}
+  img{-webkit-user-drag:none;pointer-events:none;}
+  button{font-family:inherit;}
+
+  .orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;}
+  .orb-1{width:260px;height:260px;top:-80px;left:-60px;background:rgba(240,141,176,.35);}
+  .orb-2{width:240px;height:240px;bottom:60px;right:-90px;background:rgba(217,96,138,.2);}
+
+  .app{
+    position:relative;z-index:1;display:flex;flex-direction:column;margin:0 auto;max-width:640px;
+    height:100vh;height:100dvh;height:var(--tg-viewport-stable-height,100dvh);
+    padding-top:var(--safe-t);
+  }
+
+  /* ---------- Шапка ---------- */
+  .top{display:flex;align-items:center;gap:12px;padding:12px 16px 6px;}
+  .back{
+    flex:0 0 auto;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;
+    background:var(--card);border:1.5px solid var(--line);color:var(--text);text-decoration:none;
+    font-size:22px;line-height:1;padding-bottom:3px;transition:transform .15s var(--ease);
+  }
+  .back:active{transform:scale(.9);}
+  .top__title{display:flex;flex-direction:column;line-height:1.1;}
+  .logo{font-family:var(--font-heading);font-weight:800;font-size:19px;letter-spacing:.02em;text-transform:uppercase;}
+  .logo-sub{margin-top:3px;font-size:9px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+
+  /* ---------- Холст изделия ---------- */
+  .workbench{
+    position:relative;flex:0 0 auto;margin:8px 14px 0;border-radius:26px;overflow:hidden;
+    height:clamp(176px,27vh,236px);display:flex;flex-direction:column;justify-content:center;
+    background:radial-gradient(120% 100% at 50% 0%,#fff 0%,#fff1f5 55%,#fbdde8 100%);
+    border:1px solid var(--line);box-shadow:0 14px 40px rgba(200,95,135,.14),inset 0 1px 0 #fff;
+  }
+  .workbench.shake{animation:shake .4s var(--ease);}
+  /* «желобок» бисерной доски, в котором лежит нить */
+  .workbench::before{
+    content:"";position:absolute;left:0;right:0;top:50%;height:78px;transform:translateY(-50%);
+    background:linear-gradient(180deg,rgba(217,96,138,.12),rgba(217,96,138,.04) 45%,rgba(255,255,255,.55));
+    border-block:1px solid rgba(217,96,138,.15);box-shadow:inset 0 5px 12px rgba(217,96,138,.12);
+    pointer-events:none;
+  }
+  .workbench__meta{
+    position:absolute;top:12px;left:18px;right:18px;z-index:2;display:flex;justify-content:space-between;
+    font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;pointer-events:none;
+  }
+  .workbench__meta .is-full{color:var(--danger);}
+  .workbench__hint{
+    position:absolute;left:0;right:0;bottom:11px;margin:0;text-align:center;
+    font-size:11px;color:var(--muted-dim);pointer-events:none;
+  }
+  .workbench__empty{position:absolute;inset:0;z-index:1;pointer-events:none;}
+  .ghosts{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;gap:7px;}
+  .ghosts i{
+    width:30px;height:30px;border-radius:50%;border:2px dashed rgba(217,96,138,.38);
+    animation:ghost 2.4s ease-in-out infinite;
+  }
+  .ghosts i:nth-child(2){animation-delay:.18s;} .ghosts i:nth-child(3){animation-delay:.36s;}
+  .ghosts i:nth-child(4){animation-delay:.54s;} .ghosts i:nth-child(5){animation-delay:.72s;}
+  .workbench__empty p{
+    position:absolute;left:0;right:0;top:calc(50% + 42px);margin:0;padding:0 18px;text-align:center;
+    font-size:13px;color:var(--muted);font-weight:600;
+  }
+
+  .thread-scroll{
+    position:relative;z-index:1;overflow-x:auto;overflow-y:hidden;padding:30px 0;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+    -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 20px,#000 calc(100% - 20px),transparent 100%);
+            mask-image:linear-gradient(90deg,transparent 0,#000 20px,#000 calc(100% - 20px),transparent 100%);
+  }
+  .thread-scroll::-webkit-scrollbar{display:none;}
+  .thread-track{
+    position:relative;display:flex;align-items:center;width:max-content;min-width:100%;min-height:84px;padding:0 22px;
+  }
+  .thread-track::before{ /* вощёный шнур */
+    content:"";position:absolute;left:0;right:0;top:50%;height:3px;transform:translateY(-50%);border-radius:3px;
+    background:linear-gradient(180deg,#eeb3c8,#c9658c 55%,#e69ab6);box-shadow:0 1px 2px rgba(120,40,70,.18);
+  }
+  .thread-end{
+    position:relative;z-index:1;flex:0 0 auto;width:17px;height:17px;border-radius:50%;margin:0 3px;
+    border:3px solid;border-color:#e6e9ef #a3a9b5 #8d939f #eef0f4;box-shadow:0 1px 3px rgba(80,30,50,.25);
+  }
+  .thread-bead{
+    position:relative;z-index:1;flex:0 0 auto;margin-inline:-1px;cursor:pointer;touch-action:manipulation;
+    transition:transform .15s var(--ease);
+  }
+  .thread-bead img{
+    display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(120,40,70,.3));
+  }
+  .thread-bead:active{transform:scale(.9);}
+  .thread-bead.is-new{animation:bead-drop .36s var(--spring);}
+  .thread-bead.is-landed{animation:bead-land .24s ease-out;}
+  .thread-bead.is-removing{pointer-events:none;animation:bead-out .24s ease-in forwards;}
+
+  /* ---------- Лоток с бусинами ---------- */
+  .tray{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .tabs{flex:0 0 auto;display:flex;gap:8px;padding:14px 16px 8px;overflow-x:auto;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{
+    flex:0 0 auto;border:1.5px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;
+    padding:9px 16px;font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;
+    transition:all .2s var(--ease);
+  }
+  .tab:active{transform:scale(.94);}
+  .tab[aria-selected="true"]{
+    color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--accent-soft),var(--accent));
+    box-shadow:0 6px 16px rgba(217,96,138,.3);
+  }
+  .bead-grid{
+    flex:1 1 auto;min-height:0;overflow-y:auto;display:grid;gap:10px;align-content:start;
+    grid-template-columns:repeat(auto-fill,minmax(98px,1fr));padding:6px 16px 16px;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  }
+  .bead-card{
+    appearance:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 6px 9px;
+    border:1.5px solid var(--line);border-radius:18px;background:var(--card);color:inherit;cursor:pointer;
+    touch-action:manipulation;box-shadow:0 4px 14px rgba(200,95,135,.06);
+    transition:transform .15s var(--ease),box-shadow .2s var(--ease),border-color .2s;
+    animation:card-in .4s var(--ease) both;
+  }
+  .bead-card__img{
+    display:grid;place-items:center;width:62px;height:62px;border-radius:50%;
+    background:radial-gradient(circle at 50% 38%,#fff,#fff0f4);transition:transform .22s var(--spring);
+  }
+  .bead-card__img img{
+    width:100%;height:100%;object-fit:contain;transform:scale(var(--s,1));
+    filter:drop-shadow(0 3px 3px rgba(120,40,70,.25));
+  }
+  .bead-card__name{
+    min-height:2.5em;text-align:center;font-size:12px;line-height:1.25;font-weight:600;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .bead-card__meta{display:flex;align-items:baseline;gap:6px;font-size:11px;color:var(--muted);}
+  .bead-card__meta b{font-size:13px;color:var(--accent);font-weight:800;}
+  .bead-card:active{transform:scale(.94);border-color:var(--accent-soft);}
+  .bead-card:active .bead-card__img{transform:translateY(-4px) scale(1.14) rotate(-6deg);}
+  .bead-card.is-tapped{animation:card-pop .3s ease;}
+  @media (hover:hover){.bead-card:hover{box-shadow:0 10px 24px rgba(200,95,135,.16);border-color:var(--accent-soft);}}
+
+  .sk{
+    height:132px;border-radius:18px;
+    background:linear-gradient(90deg,#fff0f4 0%,#fff 50%,#fff0f4 100%);background-size:200% 100%;
+    animation:shimmer 1.2s linear infinite;
+  }
+  .state{grid-column:1/-1;text-align:center;padding:34px 20px;color:var(--muted);font-size:14px;line-height:1.6;}
+  .state button{
+    margin-top:12px;padding:11px 22px;border-radius:999px;border:1.5px solid var(--accent);background:var(--accent-dim);
+    color:var(--accent);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+  }
+
+  /* ---------- Панель цены и действий ---------- */
+  .dock{
+    flex:0 0 auto;display:grid;gap:11px;padding:12px 16px calc(12px + var(--safe-b));
+    background:rgba(255,255,255,.93);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+    border-top:1px solid var(--line);box-shadow:0 -10px 30px rgba(200,95,135,.1);
+  }
+  .dock__row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;}
+  .price__label{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+  .price__amount{font-family:var(--font-heading);font-weight:800;font-size:29px;line-height:1.05;}
+  .price__amount small{font-size:17px;font-weight:700;}
+  .price__amount b{display:inline-block;font-weight:800;}
+  .price__amount b.is-bump{animation:bump .26s ease;}
+  .price__break{font-size:11px;color:var(--muted);text-align:right;line-height:1.55;}
+  .dock__actions{display:flex;gap:8px;}
+  .btn-icon{
+    flex:0 0 50px;height:50px;border-radius:15px;border:1.5px solid var(--line);background:var(--card);color:var(--text);
+    display:grid;place-items:center;cursor:pointer;touch-action:manipulation;transition:transform .15s var(--ease),opacity .2s;
+  }
+  .btn-icon:active{transform:scale(.92);}
+  .btn-icon:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+  .btn-primary{
+    flex:1 1 auto;height:50px;border:0;border-radius:15px;color:#fff;cursor:pointer;touch-action:manipulation;
+    background:linear-gradient(135deg,var(--accent-soft),var(--accent));box-shadow:0 8px 22px rgba(217,96,138,.35);
+    font-size:12.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    transition:transform .15s var(--ease),opacity .2s,box-shadow .2s;
+  }
+  .btn-primary:active{transform:scale(.97);}
+  .btn-primary:disabled{opacity:.45;box-shadow:none;cursor:not-allowed;transform:none;}
+  .btn-primary--wide{width:100%;flex:none;}
+
+  /* ---------- Тост ---------- */
+  .toast{
+    position:fixed;left:50%;top:calc(66px + var(--safe-t));z-index:120;display:flex;align-items:center;gap:4px;
+    max-width:calc(100% - 32px);padding:11px 18px;border-radius:999px;background:rgba(74,44,58,.94);color:#fff;
+    font-size:13px;font-weight:600;box-shadow:0 12px 34px rgba(74,44,58,.3);
+    opacity:0;transform:translate(-50%,-14px) scale(.95);pointer-events:none;transition:all .35s var(--spring);
+  }
+  .toast.is-visible{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto;}
+  .toast button{
+    margin-left:10px;padding:2px 0;border:0;background:none;color:var(--accent-soft);
+    font-weight:800;font-size:13px;cursor:pointer;
+  }
+
+  /* ---------- Оформление заказа ---------- */
+  body.modal-open{overflow:hidden;}
+  .modal{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center;}
+  .modal__backdrop{
+    position:absolute;inset:0;background:rgba(90,35,60,.4);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+    animation:fade-in .25s ease;
+  }
+  .sheet{
+    position:relative;width:100%;max-width:640px;max-height:92vh;max-height:92dvh;overflow-y:auto;overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;padding:10px 18px calc(22px + var(--safe-b));border-radius:26px 26px 0 0;
+    background:linear-gradient(180deg,#fff,#FFF6F8);box-shadow:0 -24px 70px rgba(200,95,135,.28);
+    animation:sheet-up .38s var(--ease);
+  }
+  .sheet__handle{width:40px;height:4px;border-radius:4px;background:var(--line);margin:0 auto 12px;}
+  .sheet__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .sheet__head h2{margin:0;font-family:var(--font-heading);font-size:22px;font-weight:800;text-transform:uppercase;}
+  .sheet__close{
+    width:36px;height:36px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);color:var(--text);
+    font-size:21px;line-height:1;cursor:pointer;padding-bottom:2px;
+  }
+  .mini{overflow-x:auto;scrollbar-width:none;padding:12px 14px;margin-bottom:12px;border-radius:16px;background:var(--card-hover);}
+  .mini::-webkit-scrollbar{display:none;}
+  .mini__track{position:relative;display:flex;align-items:center;width:max-content;min-width:100%;}
+  .mini__track::before{
+    content:"";position:absolute;left:0;right:0;top:50%;height:2px;transform:translateY(-50%);
+    background:linear-gradient(180deg,#eeb3c8,#c9658c);border-radius:2px;
+  }
+  .mini__track img{position:relative;margin-inline:-.5px;filter:drop-shadow(0 2px 2px rgba(120,40,70,.25));}
+  .summary{display:grid;gap:7px;padding:13px 15px;margin-bottom:16px;border-radius:16px;background:var(--card);border:1.5px solid var(--line);font-size:14px;}
+  .summary__row{display:flex;justify-content:space-between;gap:8px;}
+  .summary__row span{color:var(--muted);}
+  .summary__row--total{margin-top:3px;padding-top:10px;border-top:1px solid var(--line);font-size:18px;}
+  .summary__row--total span{color:var(--text);font-weight:700;}
+  .summary__row--total b{font-family:var(--font-heading);color:var(--accent);font-weight:800;}
+
+  .field{display:block;margin:0 0 13px;padding:0;border:0;min-width:0;}
+  .field__label{
+    display:block;margin-bottom:7px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);font-weight:700;
+  }
+  .field__label i{font-style:normal;text-transform:none;letter-spacing:0;opacity:.8;}
+  .field__input{
+    width:100%;padding:13px 15px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--text);
+    font:inherit;font-size:16px;resize:none;outline:none;transition:border-color .2s,box-shadow .2s;
+  }
+  .field__input::placeholder{color:var(--muted-dim);opacity:1;}
+  .field__input:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-dim);}
+  .field.is-invalid .field__input{border-color:var(--danger);}
+  .field__error{display:block;margin-top:5px;font-size:12px;color:var(--danger);font-weight:600;}
+  .field__error:empty{display:none;}
+  .segmented{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:13px;background:var(--card-hover);}
+  .segmented label{display:block;}
+  .segmented input{position:absolute;opacity:0;pointer-events:none;}
+  .segmented span{
+    display:block;padding:11px 0;border-radius:10px;text-align:center;font-size:13px;font-weight:700;
+    color:var(--muted);cursor:pointer;transition:all .2s var(--ease);
+  }
+  .segmented input:checked + span{color:#fff;background:linear-gradient(135deg,var(--accent-soft),var(--accent));box-shadow:0 4px 12px rgba(217,96,138,.3);}
+  .segmented input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px;}
+  .form-error{margin:0 0 13px;padding:11px 13px;border-radius:12px;background:rgba(229,83,91,.1);color:var(--danger);font-size:13.5px;font-weight:600;}
+
+  .success{text-align:center;padding:26px 6px 6px;}
+  .success__icon{
+    position:relative;width:78px;height:78px;margin:0 auto 16px;display:grid;place-items:center;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent-soft),var(--accent));color:#fff;font-size:38px;
+    box-shadow:0 12px 30px rgba(217,96,138,.4);animation:pop-in .5s var(--spring);
+  }
+  .success__icon::after{
+    content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--accent-soft);opacity:0;
+    animation:ring 1.4s ease-out .3s infinite;
+  }
+  .success h2{margin:0 0 8px;font-family:var(--font-heading);font-size:24px;font-weight:800;}
+  .success p{margin:0 0 6px;color:var(--text);font-size:15px;line-height:1.5;}
+  .success .order-no{color:var(--muted);font-size:13px;margin-bottom:22px;}
+
+  @keyframes bead-drop{from{transform:translateY(-28px) scale(.55);opacity:0;}to{transform:none;opacity:1;}}
+  @keyframes bead-land{0%{transform:scale(.82);}60%{transform:scale(1.1);}100%{transform:scale(1);}}
+  @keyframes bead-out{to{transform:scale(.3) translateY(-16px);opacity:0;width:0;margin-inline:0;}}
+  @keyframes card-in{from{opacity:0;transform:translateY(10px) scale(.96);}to{opacity:1;transform:none;}}
+  @keyframes card-pop{50%{transform:scale(.95);box-shadow:0 0 0 5px rgba(217,96,138,.14);}}
+  @keyframes bump{50%{transform:scale(1.13);}}
+  @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-7px);}40%{transform:translateX(6px);}60%{transform:translateX(-4px);}80%{transform:translateX(3px);}}
+  @keyframes ghost{0%,100%{opacity:.35;transform:translateY(0);}50%{opacity:.9;transform:translateY(-4px);}}
+  @keyframes shimmer{to{background-position:-200% 0;}}
+  @keyframes fade-in{from{opacity:0;}}
+  @keyframes sheet-up{from{transform:translateY(46px);opacity:0;}}
+  @keyframes pop-in{from{transform:scale(.4);opacity:0;}}
+  @keyframes ring{0%{transform:scale(.9);opacity:.8;}100%{transform:scale(1.35);opacity:0;}}
+
+  @media (min-width:640px){.modal{align-items:center;}.sheet{border-radius:26px;}}
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;}
+  }
+</style>
+</head>
+<body>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="app" id="app">
+
+  <header class="top">
+    <a class="back" href="/" id="backLink" aria-label="В магазин">‹</a>
+    <div class="top__title">
+      <span class="logo">Made Bar</span>
+      <span class="logo-sub">собери украшение сам</span>
+    </div>
+  </header>
+
+  <!-- Холст изделия -->
+  <section id="workbench" class="workbench" aria-label="Ваше украшение">
+    <div class="workbench__meta">
+      <span>Бусин: <span id="bead-count">0/30</span></span>
+      <span id="length-label">— см</span>
+    </div>
+
+    <div class="workbench__empty" id="workbench-empty">
+      <div class="ghosts" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <p>Выбери бусину внизу, и она нанижется на нить</p>
+    </div>
+
+    <div class="thread-scroll" id="thread-scroll">
+      <div class="thread-track" id="thread-track"></div>
+    </div>
+
+    <p class="workbench__hint" id="remove-hint" hidden>Нажми на бусину на нити, чтобы убрать её</p>
+  </section>
+
+  <!-- Лоток -->
+  <section class="tray" aria-label="Бусины">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="bead-grid" id="bead-grid" role="tabpanel"></div>
+  </section>
+
+  <!-- Цена и действия -->
+  <footer class="dock">
+    <div class="dock__row">
+      <div>
+        <div class="price__label">Итого</div>
+        <div class="price__amount"><b id="total-price">0</b> <small>₽</small></div>
+      </div>
+      <div class="price__break">
+        основа <span id="base-price">0 ₽</span><br>
+        бусины <span id="beads-price">0 ₽</span>
+      </div>
+    </div>
+    <div class="dock__actions">
+      <button class="btn-icon" id="btn-undo" type="button" aria-label="Убрать последнюю бусину" disabled>
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+      <button class="btn-icon" id="btn-clear" type="button" aria-label="Очистить нить" disabled>
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>
+      </button>
+      <button class="btn-primary" id="btn-checkout" type="button" disabled>Оформить украшение</button>
+    </div>
+  </footer>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toast-text"></span><button type="button" id="toast-btn" hidden></button>
+</div>
+
+<!-- Оформление -->
+<div class="modal" id="order-modal" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="order-title">
+    <div class="sheet__handle"></div>
+
+    <form id="order-form" novalidate>
+      <div class="sheet__head">
+        <h2 id="order-title">Оформление</h2>
+        <button type="button" class="sheet__close" data-close aria-label="Закрыть">×</button>
+      </div>
+
+      <div class="mini"><div class="mini__track" id="mini-track"></div></div>
+
+      <div class="summary">
+        <div class="summary__row"><span>Бусин на нити</span><b id="sum-count">0</b></div>
+        <div class="summary__row"><span>Длина бусин</span><b id="sum-length">—</b></div>
+        <div class="summary__row"><span>Основа</span><b id="sum-base">0 ₽</b></div>
+        <div class="summary__row"><span>Бусины</span><b id="sum-beads">0 ₽</b></div>
+        <div class="summary__row summary__row--total"><span>Итого</span><b id="sum-total">0 ₽</b></div>
+      </div>
+
+      <label class="field">
+        <span class="field__label">Имя</span>
+        <input class="field__input" name="name" type="text" autocomplete="name" maxlength="120" placeholder="Как к вам обращаться">
+        <span class="field__error" data-error-for="name"></span>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Телефон</span>
+        <input class="field__input" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+7 900 000-00-00">
+        <span class="field__error" data-error-for="phone"></span>
+      </label>
+
+      <fieldset class="field">
+        <legend class="field__label">Способ получения</legend>
+        <div class="segmented">
+          <label><input type="radio" name="delivery" value="Доставка" checked><span>Доставка</span></label>
+          <label><input type="radio" name="delivery" value="Самовывоз"><span>Самовывоз</span></label>
+        </div>
+      </fieldset>
+
+      <label class="field" id="address-field">
+        <span class="field__label">Адрес доставки</span>
+        <textarea class="field__input" name="address" rows="2" maxlength="500" autocomplete="street-address" placeholder="Город, улица, дом, квартира"></textarea>
+        <span class="field__error" data-error-for="address"></span>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Комментарий <i>(необязательно)</i></span>
+        <textarea class="field__input" name="comment" rows="2" maxlength="500" placeholder="Размер запястья, пожелания по застёжке…"></textarea>
+      </label>
+
+      <p class="form-error" id="form-error" role="alert" hidden></p>
+      <button class="btn-primary btn-primary--wide" id="btn-submit" type="submit">Отправить заказ</button>
+    </form>
+
+    <div class="success" id="order-success" hidden>
+      <div class="success__icon" aria-hidden="true">✓</div>
+      <h2>Заказ принят!</h2>
+      <p>Ваше украшение передано мастеру на сборку!</p>
+      <p class="order-no" id="order-no"></p>
+      <button type="button" class="btn-primary btn-primary--wide" id="btn-done">Готово</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const $ = (id) => document.getElementById(id);
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Настройки и состояние ----------
+  const PX_PER_MM = 5.4;                       // масштаб: 8 мм ≈ 43 px
+  const CFG = { base: 0, max: 30 };            // приходит с сервера (/api/madebar/config)
+  let catalog = {};                            // { категория: [бусины] }
+  let beadIndex = new Map();                   // id -> бусина
+  let activeCat = null;
+  let placed = [];                             // [{ uid, bead }] слева направо
+  let uidSeq = 0;
+  let lastRemoved = null;                      // для «Вернуть»
+  let submitting = false;
+  let closeTimer = 0;
+
+  // ---------- Элементы ----------
+  const $tabs = $('tabs'), $grid = $('bead-grid');
+  const $track = $('thread-track'), $scroll = $('thread-scroll'), $workbench = $('workbench');
+  const $count = $('bead-count'), $length = $('length-label');
+  const $empty = $('workbench-empty'), $hint = $('remove-hint');
+  const $total = $('total-price'), $base = $('base-price'), $beadsPrice = $('beads-price');
+  const $btnCheckout = $('btn-checkout'), $btnClear = $('btn-clear'), $btnUndo = $('btn-undo');
+  const $modal = $('order-modal'), $form = $('order-form'), $success = $('order-success');
+  const $formError = $('form-error'), $submit = $('btn-submit'), $addrField = $('address-field');
+  const $toast = $('toast'), $toastText = $('toast-text'), $toastBtn = $('toast-btn');
+
+  // ---------- Утилиты ----------
+  const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+  const fmtNum = (n) => Number(Number(n).toFixed(2)).toLocaleString('ru-RU');
+  const fmtRub = (n) => fmtNum(n) + ' ₽';
+  const beadPx = (b) => Math.round(clamp((Number(b.size_mm) || 8) * PX_PER_MM, 16, 84));
+  const haptic = (kind, type) => { try { tg && tg.HapticFeedback && tg.HapticFeedback[kind](type); } catch (e) {} };
+  const sumPrice = () => Math.round((CFG.base + placed.reduce((s, p) => s + p.bead.price, 0)) * 100) / 100;
+  const sumMm = () => placed.reduce((s, p) => s + (Number(p.bead.size_mm) || 0), 0);
+
+  async function getJSON(url) {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  function confirmAsk(message) {
+    return new Promise((resolve) => {
+      if (tg && tg.showConfirm && tg.initData && tg.isVersionAtLeast && tg.isVersionAtLeast('6.2')) {
+        tg.showConfirm(message, (ok) => resolve(Boolean(ok)));
+      } else {
+        resolve(window.confirm(message));
+      }
+    });
+  }
+
+  // ---------- Тост ----------
+  let toastTimer = 0;
+  function showToast(text, action) {
+    $toastText.textContent = text;
+    $toastBtn.hidden = !action;
+    if (action) {
+      $toastBtn.textContent = action.label;
+      $toastBtn.onclick = () => { hideToast(); action.fn(); };
+    }
+    $toast.classList.add('is-visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, action ? 4200 : 2000);
+  }
+  function hideToast() { $toast.classList.remove('is-visible'); }
+
+  // ---------- Telegram ----------
+  function initTelegram() {
+    if (!tg) return;
+    try { tg.ready(); tg.expand(); } catch (e) {}
+    try { tg.setHeaderColor && tg.setHeaderColor('#FFF6F8'); tg.setBackgroundColor && tg.setBackgroundColor('#FFF6F8'); } catch (e) {}
+    try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
+    if (tg.initData) $('backLink').hidden = true;     // внутри Telegram есть нативная кнопка «Назад»
+    try {
+      if (tg.BackButton && tg.isVersionAtLeast && tg.isVersionAtLeast('6.1')) {
+        tg.BackButton.show();
+        tg.BackButton.onClick(() => { if (!$modal.hidden) closeModal(); else location.href = '/'; });
+      }
+    } catch (e) {}
+  }
+
+  // ---------- Загрузка каталога ----------
+  function showSkeleton() {
+    $tabs.replaceChildren();
+    $grid.replaceChildren(...Array.from({ length: 9 }, () => { const d = document.createElement('div'); d.className = 'sk'; return d; }));
+  }
+  function showGridState(text, retry) {
+    const box = document.createElement('div');
+    box.className = 'state';
+    box.textContent = text;
+    if (retry) {
+      box.append(document.createElement('br'));
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = 'Повторить';
+      btn.onclick = loadCatalog;
+      box.append(btn);
+    }
+    $grid.replaceChildren(box);
+  }
+
+  function applyCatalog(cat) {
+    catalog = cat || {};
+    beadIndex = new Map();
+    Object.values(catalog).forEach((list) => list.forEach((b) => beadIndex.set(b.id, b)));
+  }
+
+  async function loadCatalog() {
+    showSkeleton();
+    try {
+      const [cfg, cat] = await Promise.all([getJSON('/api/madebar/config'), getJSON('/api/beads')]);
+      CFG.base = Number(cfg.base_price) || 0;
+      CFG.max = Number(cfg.max_beads) || 30;
+      applyCatalog(cat);
+    } catch (err) {
+      console.error('Не удалось загрузить каталог:', err);
+      showGridState('Не удалось загрузить бусины. Проверьте интернет.', true);
+      return;
+    }
+    const cats = Object.keys(catalog);
+    if (!cats.length) { showGridState('Бусины скоро появятся. Загляните позже!'); updateUI(); return; }
+    renderTabs(cats);
+    selectCategory(cats.includes(activeCat) ? activeCat : cats[0]);
+    updateUI();
+  }
+
+  function renderTabs(cats) {
+    $tabs.replaceChildren(...cats.map((cat) => {
+      const btn = document.createElement('button');
+      btn.className = 'tab'; btn.type = 'button'; btn.setAttribute('role', 'tab');
+      btn.dataset.category = cat; btn.textContent = cat;
+      return btn;
+    }));
+  }
+
+  function selectCategory(cat) {
+    activeCat = cat;
+    $tabs.querySelectorAll('.tab').forEach((t) => {
+      const on = t.dataset.category === cat;
+      t.setAttribute('aria-selected', String(on));
+      if (on) t.scrollIntoView({ inline: 'center', block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+    });
+    renderGrid(catalog[cat] || []);
+    $grid.scrollTop = 0;
+  }
+
+  function renderGrid(beads) {
+    $grid.replaceChildren(...beads.map((bead, i) => {
+      const card = document.createElement('button');
+      card.className = 'bead-card'; card.type = 'button';
+      card.dataset.id = bead.id;
+      card.style.animationDelay = Math.min(i * 18, 260) + 'ms';
+
+      const imgWrap = document.createElement('span');
+      imgWrap.className = 'bead-card__img';
+      const img = document.createElement('img');
+      img.src = bead.image_url; img.alt = ''; img.draggable = false; img.loading = 'lazy'; img.decoding = 'async';
+      img.style.setProperty('--s', clamp((Number(bead.size_mm) || 8) / 9, 0.62, 1).toFixed(2));
+      imgWrap.append(img);
+
+      const name = document.createElement('span');
+      name.className = 'bead-card__name'; name.textContent = bead.name;
+
+      const meta = document.createElement('span');
+      meta.className = 'bead-card__meta';
+      const price = document.createElement('b');
+      price.textContent = fmtRub(bead.price);
+      meta.append(price, document.createTextNode(fmtNum(bead.size_mm || 8) + ' мм'));
+
+      card.append(imgWrap, name, meta);
+      return card;
+    }));
+  }
+
+  $tabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('.tab');
+    if (tab && tab.dataset.category !== activeCat) { selectCategory(tab.dataset.category); haptic('selectionChanged'); }
+  });
+
+  $grid.addEventListener('click', (e) => {
+    const card = e.target.closest('.bead-card');
+    if (!card) return;
+    const bead = beadIndex.get(Number(card.dataset.id));
+    if (!bead) return;
+    if (addBead(bead, card.querySelector('.bead-card__img img'))) {
+      card.classList.remove('is-tapped'); void card.offsetWidth; card.classList.add('is-tapped');
+    }
+  });
+
+  // ---------- Нить: добавление ----------
+  function mkEnd() { const s = document.createElement('span'); s.className = 'thread-end'; return s; }
+  const $endL = mkEnd(), $endR = mkEnd();
+
+  function makeBeadEl(item) {
+    const px = beadPx(item.bead);
+    const el = document.createElement('div');
+    el.className = 'thread-bead';
+    el.dataset.uid = item.uid;
+    el.style.width = el.style.height = px + 'px';
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', 'Убрать: ' + item.bead.name);
+    const img = document.createElement('img');
+    img.src = item.bead.image_url; img.alt = ''; img.draggable = false; img.decoding = 'async';
+    el.append(img);
+    return el;
+  }
+
+  function rebuildThread() {
+    $track.replaceChildren($endL, ...placed.map(makeBeadEl), $endR);
+  }
+
+  // бусина «перелетает» из лотка на нить
+  function flyIn(el, fromImg) {
+    $scroll.scrollLeft = $scroll.scrollWidth;           // мгновенно к последней бусине
+    if (!fromImg || reduceMotion || !el.animate) { el.classList.add('is-new'); return; }
+    try {
+      const a = fromImg.getBoundingClientRect(), b = el.getBoundingClientRect();
+      if (!a.width || !b.width) { el.classList.add('is-new'); return; }
+      el.style.visibility = 'hidden';
+      const ghost = document.createElement('img');
+      ghost.src = fromImg.currentSrc || fromImg.src; ghost.alt = '';
+      ghost.style.cssText = 'position:fixed;z-index:90;pointer-events:none;object-fit:contain;transform-origin:center;' +
+        `left:${a.left}px;top:${a.top}px;width:${a.width}px;height:${a.height}px;` +
+        'filter:drop-shadow(0 6px 8px rgba(120,40,70,.35));';
+      document.body.append(ghost);
+      const dx = (b.left + b.width / 2) - (a.left + a.width / 2);
+      const dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+      const s = b.width / a.width;
+      let done = false;
+      const finish = () => {
+        if (done) return; done = true;
+        ghost.remove(); el.style.visibility = ''; el.classList.add('is-landed');
+        haptic('impactOccurred', 'light');
+      };
+      const anim = ghost.animate([
+        { transform: 'translate(0,0) scale(1)' },
+        { transform: `translate(${dx * 0.55}px,${dy * 0.55 - 46}px) scale(${((1 + s) / 2) * 1.08})`, offset: 0.55 },
+        { transform: `translate(${dx}px,${dy}px) scale(${s})` },
+      ], { duration: 420, easing: 'cubic-bezier(.3,.6,.35,1)', fill: 'forwards' });
+      anim.onfinish = finish; anim.oncancel = finish;
+      setTimeout(finish, 800);
+    } catch (err) {
+      el.style.visibility = ''; el.classList.add('is-new');
+    }
+  }
+
+  function addBead(bead, fromImg) {
+    if (placed.length >= CFG.max) {
+      showToast('Шнурок заполнен');
+      haptic('notificationOccurred', 'warning');
+      $workbench.classList.remove('shake'); void $workbench.offsetWidth; $workbench.classList.add('shake');
+      return false;
+    }
+    const item = { uid: ++uidSeq, bead };
+    placed.push(item);
+    lastRemoved = null;
+    const el = makeBeadEl(item);
+    $track.insertBefore(el, $endR);
+    flyIn(el, fromImg);
+    updateUI();
+    return true;
+  }
+
+  // ---------- Нить: удаление ----------
+  function dismissEl(el, extraMs) {
+    let done = false;
+    const finish = () => { if (!done) { done = true; el.remove(); } };
+    el.classList.remove('is-new', 'is-landed');
+    el.classList.add('is-removing');
+    el.addEventListener('animationend', finish, { once: true });
+    setTimeout(finish, 420 + (extraMs || 0));     // запас: при reduced-motion событие может не прийти
+  }
+
+  function removeBead(uid) {
+    const index = placed.findIndex((p) => p.uid === uid);
+    if (index < 0) return;
+    const [item] = placed.splice(index, 1);
+    lastRemoved = { item, index };
+    const el = $track.querySelector(`[data-uid="${uid}"]`);
+    if (el) dismissEl(el);
+    updateUI();
+    haptic('impactOccurred', 'soft');
+    showToast(item.bead.name + ': убрана', { label: 'Вернуть', fn: restoreLast });
+  }
+
+  function restoreLast() {
+    if (!lastRemoved) return;
+    if (placed.length >= CFG.max) { showToast('Шнурок заполнен'); return; }
+    const { item, index } = lastRemoved;
+    lastRemoved = null;
+    const i = Math.min(index, placed.length);
+    placed.splice(i, 0, item);
+    const el = makeBeadEl(item);
+    el.classList.add('is-new');
+    const next = placed[i + 1];
+    const ref = next && $track.querySelector(`[data-uid="${next.uid}"]`);
+    $track.insertBefore(el, ref || $endR);
+    updateUI();
+    haptic('impactOccurred', 'light');
+  }
+
+  $track.addEventListener('click', (e) => {
+    const el = e.target.closest('.thread-bead');
+    if (!el || el.classList.contains('is-removing')) return;
+    removeBead(Number(el.dataset.uid));
+  });
+
+  $btnUndo.addEventListener('click', () => {
+    const last = placed[placed.length - 1];
+    if (last) removeBead(last.uid);
+  });
+
+  async function clearAll() {
+    if (!placed.length) return;
+    const ok = await confirmAsk('Очистить нить? Все бусины будут удалены.');
+    if (!ok) return;
+    const nodes = [...$track.querySelectorAll('.thread-bead:not(.is-removing)')];   // снимок: новые не заденем
+    placed = []; lastRemoved = null;
+    nodes.forEach((n, i) => { n.style.animationDelay = (i * 12) + 'ms'; dismissEl(n, i * 12); });
+    $scroll.scrollTo({ left: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+    updateUI();
+    haptic('notificationOccurred', 'success');
+  }
+  $btnClear.addEventListener('click', clearAll);
+
+  // ---------- Живой счётчик ----------
+  let totalShown = null, rafId = 0;
+  function animateNumber(el, to) {
+    const from = totalShown === null ? to : totalShown;
+    totalShown = to;
+    cancelAnimationFrame(rafId);
+    if (from === to || reduceMotion) { el.textContent = fmtNum(to); return; }
+    const t0 = performance.now(), dur = 280;
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      el.textContent = k < 1 ? fmtNum(Math.round(from + (to - from) * e)) : fmtNum(to);
+      if (k < 1) rafId = requestAnimationFrame(step);
+    };
+    rafId = requestAnimationFrame(step);
+    el.classList.remove('is-bump'); void el.offsetWidth; el.classList.add('is-bump');
+  }
+
+  function updateUI() {
+    const n = placed.length;
+    const beadsPrice = Math.round(placed.reduce((s, p) => s + p.bead.price, 0) * 100) / 100;
+
+    $count.textContent = n + '/' + CFG.max;
+    $count.classList.toggle('is-full', n >= CFG.max);
+    $length.textContent = n ? '≈ ' + fmtNum(sumMm() / 10) + ' см' : '— см';
+    $base.textContent = fmtRub(CFG.base);
+    $beadsPrice.textContent = fmtRub(beadsPrice);
+    animateNumber($total, sumPrice());
+
+    $empty.hidden = n > 0;
+    $hint.hidden = n === 0;
+    $btnCheckout.disabled = n === 0;
+    $btnClear.disabled = n === 0;
+    $btnUndo.disabled = n === 0;
+  }
+
+  // ---------- Оформление ----------
+  const CONTACT_KEY = 'madebar_contact';
+  const loadContact = () => { try { return JSON.parse(localStorage.getItem(CONTACT_KEY)) || {}; } catch (e) { return {}; } };
+  const saveContact = (d) => {
+    try { localStorage.setItem(CONTACT_KEY, JSON.stringify({ name: d.name, phone: d.phone, delivery: d.delivery, address: d.address })); } catch (e) {}
+  };
+
+  const currentDelivery = () => $form.elements.delivery.value;
+  function syncDeliveryUI() { $addrField.hidden = currentDelivery() !== 'Доставка'; }
+  $form.addEventListener('change', (e) => { if (e.target.name === 'delivery') syncDeliveryUI(); });
+
+  function fillSummary() {
+    const beadsPrice = Math.round(placed.reduce((s, p) => s + p.bead.price, 0) * 100) / 100;
+    $('sum-count').textContent = placed.length;
+    $('sum-length').textContent = '≈ ' + fmtNum(sumMm() / 10) + ' см';
+    $('sum-base').textContent = fmtRub(CFG.base);
+    $('sum-beads').textContent = fmtRub(beadsPrice);
+    $('sum-total').textContent = fmtRub(sumPrice());
+    $('mini-track').replaceChildren(...placed.map((p) => {
+      const img = document.createElement('img');
+      const px = Math.round(beadPx(p.bead) * 0.62);
+      img.src = p.bead.image_url; img.alt = ''; img.width = px; img.height = px;
+      return img;
+    }));
+  }
+
+  function clearErrors() {
+    $form.querySelectorAll('.field.is-invalid').forEach((f) => f.classList.remove('is-invalid'));
+    $form.querySelectorAll('[data-error-for]').forEach((s) => (s.textContent = ''));
+    $formError.hidden = true;
+  }
+  function showFormError(msg) { $formError.textContent = msg; $formError.hidden = false; }
+
+  function openModal() {
+    if (!placed.length) return;
+    const saved = loadContact();
+    const f = $form.elements;
+    if (!f.name.value) f.name.value = saved.name || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || '';
+    if (!f.phone.value && saved.phone) f.phone.value = saved.phone;
+    if (!f.address.value && saved.address) f.address.value = saved.address;
+    if (saved.delivery) { const r = $form.querySelector(`input[name="delivery"][value="${saved.delivery}"]`); if (r) r.checked = true; }
+    fillSummary(); clearErrors(); syncDeliveryUI();
+    $form.hidden = false; $success.hidden = true;
+    $modal.hidden = false;
+    document.body.classList.add('modal-open');
+  }
+
+  function closeModal() {
+    if (submitting) return;
+    if (!$success.hidden) { finish(); return; }
+    $modal.hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+
+  $btnCheckout.addEventListener('click', openModal);
+  $modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$modal.hidden) closeModal(); });
+
+  $form.elements.phone.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d+()\-\s]/g, ''); });
+  $form.addEventListener('input', (e) => {
+    const field = e.target.closest('.field');
+    if (!field) return;
+    field.classList.remove('is-invalid');
+    const span = field.querySelector('[data-error-for]');
+    if (span) span.textContent = '';
+  });
+
+  function validate(d) {
+    const errors = {};
+    if (d.name.length < 2) errors.name = 'Укажите имя';
+    const digits = d.phone.replace(/\D/g, '');
+    if (!d.phone) errors.phone = 'Телефон обязателен';
+    else if (digits.length < 10 || digits.length > 15) errors.phone = 'Проверьте номер телефона';
+    if (d.delivery === 'Доставка' && d.address.length < 5) errors.address = 'Укажите адрес доставки';
+    return errors;
+  }
+  function showErrors(errors) {
+    for (const [field, msg] of Object.entries(errors)) {
+      const span = $form.querySelector(`[data-error-for="${field}"]`);
+      if (span) { span.textContent = msg; span.closest('.field').classList.add('is-invalid'); }
+    }
+    const el = $form.elements[Object.keys(errors)[0]];
+    if (el && el.focus) el.focus();
+  }
+
+  // Сервер отклонил заказ (цены/наличие изменились): подтягиваем свежий каталог и сверяем нить
+  async function refreshAfterReject() {
+    try {
+      applyCatalog(await getJSON('/api/beads'));
+      placed = placed.filter((p) => {
+        const fresh = beadIndex.get(p.bead.id);
+        if (fresh) p.bead = fresh;
+        return Boolean(fresh);
+      });
+      rebuildThread();
+      const cats = Object.keys(catalog);
+      if (cats.length) { renderTabs(cats); selectCategory(cats.includes(activeCat) ? activeCat : cats[0]); }
+      updateUI();
+      if (placed.length) fillSummary();
+      else { submitting = false; closeModal(); showToast('Выбранные бусины закончились'); }
+    } catch (e) { /* без сети остаётся сообщение сервера */ }
+  }
+
+  $form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (submitting || !placed.length) return;
+    clearErrors();
+
+    const f = $form.elements;
+    const d = {
+      name: f.name.value.trim(), phone: f.phone.value.trim(), delivery: currentDelivery(),
+      address: f.address.value.trim(), comment: f.comment.value.trim(),
+    };
+    const errors = validate(d);
+    if (Object.keys(errors).length) { showErrors(errors); haptic('notificationOccurred', 'error'); return; }
+
+    const payload = {
+      customer_name: d.name, customer_phone: d.phone, delivery_type: d.delivery,
+      address: d.delivery === 'Доставка' ? d.address : null,
+      comment: d.comment || null,
+      beads_ids: placed.map((p) => p.bead.id),      // порядок = слева направо
+      total_price: sumPrice(),
+    };
+
+    submitting = true;
+    $submit.disabled = true; $submit.textContent = 'Отправляем…';
+    try {
+      const res = await fetch('/api/orders/custom', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.ok) {
+        saveContact(d);
+        showSuccess(json.order_id);
+      } else {
+        showFormError(json.error || 'Не удалось отправить заказ. Попробуйте ещё раз.');
+        haptic('notificationOccurred', 'error');
+        if (res.status === 400 || res.status === 409) await refreshAfterReject();
+      }
+    } catch (err) {
+      console.error(err);
+      showFormError('Нет соединения. Проверьте интернет и повторите попытку.');
+      haptic('notificationOccurred', 'error');
+    } finally {
+      submitting = false;
+      $submit.disabled = false; $submit.textContent = 'Отправить заказ';
+    }
+  });
+
+  function showSuccess(orderId) {
+    $form.hidden = true; $success.hidden = false;
+    $('order-no').textContent = orderId ? 'Заказ №' + orderId : '';
+    haptic('notificationOccurred', 'success');
+    // нить очищаем сразу, чтобы заказ нельзя было отправить повторно
+    placed = []; lastRemoved = null;
+    rebuildThread(); updateUI();
+    closeTimer = setTimeout(finish, 3500);
+  }
+
+  function finish() {
+    clearTimeout(closeTimer);
+    if (tg && tg.close && tg.initData) tg.close();
+    else location.href = '/';
+  }
+  $('btn-done').addEventListener('click', finish);
+
+  // ---------- Старт ----------
+  initTelegram();
+  rebuildThread();
+  updateUI();
+  loadCatalog();
+})();
+</script>
+</body>
+</html>

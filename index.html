@@ -355,6 +355,24 @@
     .chip:hover:not(.active){color:var(--text);border-color:var(--muted-dim);}
     .card-like:hover:not(.active){border-color:var(--accent);}
   }
+
+  /* Баннер Made Bar */
+  .mb-banner{
+    position:relative;overflow:hidden;display:flex;align-items:center;gap:14px;margin:16px 20px 0;padding:14px 16px;
+    border-radius:18px;text-decoration:none;color:#fff;
+    background:linear-gradient(135deg,var(--accent-neon),var(--accent-color));
+    box-shadow:0 10px 26px rgba(217,96,138,.3);transition:transform .2s var(--ease);
+  }
+  .mb-banner:active{transform:scale(.98);}
+  .mb-banner::after{
+    content:"";position:absolute;right:-30px;top:-40px;width:120px;height:120px;border-radius:50%;
+    background:rgba(255,255,255,.14);pointer-events:none;
+  }
+  .mb-banner__art{flex:0 0 auto;width:92px;height:auto;filter:drop-shadow(0 3px 4px rgba(120,40,70,.25));}
+  .mb-banner__text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;position:relative;z-index:1;}
+  .mb-banner__text b{font-family:var(--font-heading);font-size:18px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;}
+  .mb-banner__text small{font-size:12px;opacity:.92;line-height:1.35;}
+  .mb-banner__arrow{font-size:26px;line-height:1;position:relative;z-index:1;padding-bottom:3px;}
 </style></style>
 </head>
 <body>
@@ -408,6 +426,20 @@
   <div class="ticker-wrap">
     <div class="ticker" id="ticker"></div>
   </div>
+
+  <a class="mb-banner" href="/madebar" id="madebarBanner">
+    <svg class="mb-banner__art" viewBox="0 0 104 44" aria-hidden="true">
+      <line x1="0" y1="22" x2="104" y2="22" stroke="#fff" stroke-opacity=".75" stroke-width="2"/>
+      <circle cx="15" cy="22" r="12" fill="#fff"/>
+      <circle cx="43" cy="22" r="10" fill="#FFE3EC"/>
+      <circle cx="68" cy="22" r="12" fill="#fff"/>
+      <circle cx="91" cy="22" r="8" fill="#FFD1E0"/>
+      <ellipse cx="11" cy="17" rx="4" ry="2.4" fill="#F08DB0" fill-opacity=".45" transform="rotate(-30 11 17)"/>
+      <ellipse cx="64" cy="17" rx="4" ry="2.4" fill="#F08DB0" fill-opacity=".45" transform="rotate(-30 64 17)"/>
+    </svg>
+    <span class="mb-banner__text"><b>Made Bar</b><small>Собери украшение из бусин сам</small></span>
+    <span class="mb-banner__arrow" aria-hidden="true">›</span>
+  </a>
 
   <div class="filters-row">
     <div class="filters" id="filters"></div>

@@ -214,6 +214,13 @@ def cmd_start(message: types.Message):
         )
     )
 
+    keyboard.add(
+        types.InlineKeyboardButton(
+            text="🧵 Собрать украшение (Made Bar)",
+            web_app=types.WebAppInfo(url=BASE_URL + "/madebar")
+        )
+    )
+
     is_admin = bool(message.from_user) and message.from_user.id in ADMIN_CHAT_IDS
     if is_admin:
         keyboard.add(
@@ -844,6 +851,7 @@ def webhook():
 @app.errorhandler(401)
 @app.errorhandler(403)
 @app.errorhandler(404)
+@app.errorhandler(413)
 def handle_api_errors(err):
     if request.path.startswith("/api/"):
         return jsonify({"error": getattr(err, "description", str(err))}), err.code
@@ -859,6 +867,10 @@ def setup_webhook():
     bot.set_webhook(url=url)
     log.info("Webhook установлен: %s", url)
 
+
+# --- Made Bar (конструктор украшений) ------------------------------------
+from madebar import setup_madebar  # noqa: E402
+setup_madebar(app, bot, ADMIN_CHAT_IDS, require_admin, UPLOAD_DIR)
 
 setup_webhook()
 
