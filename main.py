@@ -8,6 +8,8 @@ from flask import Flask, request, send_from_directory, abort, jsonify
 import telebot
 from telebot import types
 
+import store
+
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("korolko")
 
@@ -40,6 +42,8 @@ UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+IMAGE_MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+              ".webp": "image/webp", ".gif": "image/gif"}
 ALLOWED_BADGES = {"hit", "trend", "sale", "instock"}
 ALLOWED_PROMO_TYPES = {"percent", "fixed"}
 
@@ -59,51 +63,35 @@ def require_admin():
 
 
 def load_products():
-    if not os.path.exists(PRODUCTS_FILE):
-        return []
-    with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return store.load_doc("products")
 
 
 def save_products(items):
-    with open(PRODUCTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+    store.save_doc("products", items)
 
 
 def load_orders():
-    if not os.path.exists(ORDERS_FILE):
-        return []
-    with open(ORDERS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return store.load_doc("orders")
 
 
 def save_orders(items):
-    with open(ORDERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+    store.save_doc("orders", items)
 
 
 def load_questions():
-    if not os.path.exists(QUESTIONS_FILE):
-        return []
-    with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return store.load_doc("questions")
 
 
 def save_questions(items):
-    with open(QUESTIONS_FILE, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+    store.save_doc("questions", items)
 
 
 def load_promos():
-    if not os.path.exists(PROMOS_FILE):
-        return []
-    with open(PROMOS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return store.load_doc("promos")
 
 
 def save_promos(items):
-    with open(PROMOS_FILE, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+    store.save_doc("promos", items)
 
 
 def fmt_price(n):
@@ -256,7 +244,9 @@ def index():
 
 @app.route("/products.json", methods=["GET"])
 def products():
-    return send_from_directory(APP_DIR, "products.json")
+    resp = jsonify(load_products())
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @app.route("/api/order", methods=["POST"])
@@ -412,7 +402,13 @@ def customer_orders():
         abort(400, description="Некорректный tg_id")
     orders = load_orders()
     mine = [o for o in orders if o.get("customer_chat_id") == tg_id]
-    mine.sort(key=lambda o: o.get("id", 0), reverse=True)
+    # Заказы конструктора Made Bar лежат в таблице custom_orders: добавляем их в историю
+    try:
+        from bead_api import customer_madebar_orders
+        mine += customer_madebar_orders(tg_id)
+    except Exception:
+        log.exception("Не удалось загрузить заказы Made Bar для профиля")
+    mine.sort(key=lambda o: o.get("created_at") or "", reverse=True)
     return jsonify(mine)
 
 
@@ -512,6 +508,13 @@ def create_question():
 
 @app.route("/uploads/<path:filename>", methods=["GET"])
 def uploaded_file(filename):
+    # Фото хранятся в базе (переживают деплой); диск — запасной вариант
+    found = store.get_upload(filename)
+    if found:
+        data, content_type = found
+        resp = app.response_class(data, mimetype=content_type)
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
     return send_from_directory(UPLOAD_DIR, filename)
 
 
@@ -631,7 +634,10 @@ def admin_upload():
     if ext not in ALLOWED_IMAGE_EXT:
         abort(400, description="Недопустимый формат файла")
     filename = f"{uuid.uuid4().hex}{ext}"
-    file.save(os.path.join(UPLOAD_DIR, filename))
+    data = file.read()
+    with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
+        f.write(data)
+    store.save_upload(filename, data, IMAGE_MIME.get(ext, "application/octet-stream"))
     return jsonify({"url": f"/uploads/{filename}"}), 201
 
 

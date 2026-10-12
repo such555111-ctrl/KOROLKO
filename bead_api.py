@@ -87,6 +87,14 @@ def _validate_order(data: dict):
     if comment and len(comment) > 500:
         return None, "Комментарий слишком длинный"
 
+    # Telegram-аккаунт покупателя (из мини-аппа): нужен, чтобы заказ был виден в профиле
+    tg_user = data.get("tg_user") if isinstance(data.get("tg_user"), dict) else {}
+    try:
+        chat_id = int(tg_user.get("id")) if tg_user.get("id") else None
+    except (TypeError, ValueError):
+        chat_id = None
+    username = (str(tg_user.get("username") or "").strip()[:64]) or None
+
     ids = data.get("beads_ids")
     if not isinstance(ids, list) or not ids:
         return None, "Украшение пустое: добавьте хотя бы одну бусину"
@@ -105,6 +113,7 @@ def _validate_order(data: dict):
         "customer_name": name, "customer_phone": phone, "delivery_type": delivery,
         "address": address, "comment": comment, "beads_ids": ids,
         "client_total": client_total,
+        "customer_chat_id": chat_id, "customer_username": username,
     }, None
 
 
@@ -125,6 +134,8 @@ def _build_recipe(order: CustomOrder, beads_by_id: dict) -> str:
         lines.append(f"📍 {esc(order.address)}")
     if order.comment:
         lines.append(f"💬 {esc(order.comment)}")
+    if order.customer_username:
+        lines.append(f"✈️ @{esc(order.customer_username)}")
 
     lines += ["", f"<b>Рецепт сборки</b> (слева направо, {len(seq)} шт., бусины ≈ {total_mm / 10:.1f} см):"]
     for pos, bead_id in enumerate(seq, start=1):
@@ -221,6 +232,8 @@ def create_custom_order():
         customer_name=clean["customer_name"], customer_phone=clean["customer_phone"],
         delivery_type=clean["delivery_type"], address=clean["address"],
         comment=clean["comment"], beads_sequence=ids, total_price=server_total,
+        customer_chat_id=clean["customer_chat_id"],
+        customer_username=clean["customer_username"],
         status="new",
     )
     try:
@@ -233,6 +246,66 @@ def create_custom_order():
 
     _notify_admins(_build_recipe(order, beads_by_id))
     return jsonify({"ok": True, "order_id": order.id, "total_price": server_total}), 201
+
+
+# --- История заказов в профиле -----------------------------------------
+
+def customer_madebar_orders(tg_id: int) -> list:
+    """Заказы Made Bar покупателя в том же формате, что и обычные заказы магазина."""
+    session = SessionLocal()
+    orders = session.scalars(
+        select(CustomOrder).where(CustomOrder.customer_chat_id == tg_id)
+        .order_by(CustomOrder.id.desc())
+    ).all()
+    if not orders:
+        return []
+
+    all_ids = {i for o in orders for i in (o.beads_sequence or [])}
+    beads = {b.id: b for b in session.scalars(select(Bead).where(Bead.id.in_(all_ids)))} if all_ids else {}
+
+    result = []
+    for o in orders:
+        items = [{"name": "Основа (шнурок + застёжка)", "qty": 1}]
+        for bead_id, qty in Counter(o.beads_sequence or []).items():
+            b = beads.get(bead_id)
+            items.append({"name": b.name if b else f"Бусина №{bead_id}", "qty": qty})
+        result.append({
+            "id": o.id, "kind": "madebar", "number": f"MB-{o.id}",
+            "created_at": o.to_dict()["created_at"],
+            "status": o.status, "items": items,
+            "discount": 0, "total": o.total_price,
+        })
+    return result
+
+
+@bead_bp.route("/api/orders/custom/<int:order_id>/cancel", methods=["POST"])
+def cancel_custom_order(order_id):
+    """Покупатель отменяет свой заказ Made Bar, пока он в статусе «Новый»."""
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        tg_id = int(data.get("tg_id"))
+    except (TypeError, ValueError):
+        return _error("Некорректный tg_id")
+
+    session = SessionLocal()
+    order = session.get(CustomOrder, order_id)
+    if not order:
+        return _error("Заказ не найден", 404)
+    if order.customer_chat_id != tg_id:
+        return _error("Это не ваш заказ", 403)
+    if order.status != "new":
+        return _error("Заказ уже в обработке — отмена недоступна")
+
+    order.status = "cancelled"
+    try:
+        session.commit()
+    except Exception:
+        session.rollback()
+        log.exception("Ошибка отмены заказа Made Bar %s", order_id)
+        return _error("Не удалось отменить заказ", 500)
+
+    _notify_admins(f"❌ Клиент отменил заказ Made Bar #{order_id}")
+    return jsonify({"id": order.id, "kind": "madebar", "status": order.status})
 
 
 # --- Подключение --------------------------------------------------------

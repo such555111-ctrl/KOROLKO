@@ -937,6 +937,10 @@
       comment: d.comment || null,
       beads_ids: placed.map((p) => p.bead.id),      // порядок = слева направо
       total_price: sumPrice(),
+      // чтобы заказ появился в профиле магазина
+      tg_user: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user)
+        ? { id: tg.initDataUnsafe.user.id, username: tg.initDataUnsafe.user.username || null }
+        : null,
     };
 
     submitting = true;

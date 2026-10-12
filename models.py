@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    JSON, Boolean, DateTime, Float, Integer, String, Text,
+    JSON, BigInteger, Boolean, DateTime, Float, Integer, LargeBinary, String, Text,
     create_engine, inspect, text,
 )
 from sqlalchemy.orm import (
@@ -25,7 +25,9 @@ if DATABASE_URL.startswith("sqlite") and os.environ.get("RENDER"):
         "при следующем деплое. Подключите PostgreSQL (см. README)."
     )
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
+# Neon усыпляет неактивную базу и закрывает старые соединения:
+# pool_pre_ping проверяет соединение перед использованием, pool_recycle обновляет его.
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300, future=True)
 SessionLocal = scoped_session(
     sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 )
@@ -86,6 +88,9 @@ class CustomOrder(Base):
     delivery_type: Mapped[str] = mapped_column(String(20), nullable=False)  # «Доставка» / «Самовывоз»
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Кто заказал в Telegram: по этому ID заказ показывается в профиле покупателя
+    customer_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    customer_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # Массив ID бусин по порядку слева направо, напр. [3, 7, 7, 12]
     beads_sequence: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     total_price: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
@@ -102,6 +107,8 @@ class CustomOrder(Base):
             "delivery_type": self.delivery_type,
             "address": self.address,
             "comment": self.comment,
+            "customer_chat_id": self.customer_chat_id,
+            "customer_username": self.customer_username,
             "beads_sequence": self.beads_sequence,
             "total_price": self.total_price,
             "status": self.status,
@@ -109,12 +116,40 @@ class CustomOrder(Base):
         }
 
 
+class StoreDoc(Base):
+    """Документы магазина: товары, заказы, промокоды, вопросы (раньше — JSON-файлы)."""
+    __tablename__ = "store_docs"
+
+    name: Mapped[str] = mapped_column(String(40), primary_key=True)
+    data: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+
+class UploadedFile(Base):
+    """Загруженные из админки фото: лежат в базе, а не на диске контейнера."""
+    __tablename__ = "uploaded_files"
+
+    filename: Mapped[str] = mapped_column(String(120), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+
 # --- Создание таблиц ----------------------------------------------------
 # Колонки, добавленные позже: create_all их не дописывает в уже
 # существующие таблицы, поэтому дописываем сами (безопасно, идемпотентно).
 _LATE_COLUMNS = {
     "beads": {"size_mm": "FLOAT DEFAULT 8.0"},
-    "custom_orders": {"comment": "TEXT", "status": "VARCHAR(20) DEFAULT 'new'"},
+    "custom_orders": {
+        "comment": "TEXT",
+        "status": "VARCHAR(20) DEFAULT 'new'",
+        "customer_chat_id": "BIGINT",
+        "customer_username": "VARCHAR(64)",
+    },
 }
 
 
@@ -137,4 +172,4 @@ def init_db() -> None:
 
 if __name__ == "__main__":
     init_db()
-    print("Таблицы beads и custom_orders готовы.")
+    print("Таблицы готовы.")

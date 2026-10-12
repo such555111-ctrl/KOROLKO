@@ -8,6 +8,7 @@ from collections import Counter
 from flask import Blueprint, abort, jsonify, request
 from sqlalchemy import func, select
 
+import store
 from models import Bead, CustomOrder, SessionLocal
 
 log = logging.getLogger("korolko.beadadmin")
@@ -45,6 +46,7 @@ def _cleanup_file(session, url: str):
         return
     path = os.path.join(_upload_dir, os.path.basename(url))   # basename: защита от ../
     try:
+        store.delete_upload(os.path.basename(url))
         if os.path.isfile(path):
             os.remove(path)
     except OSError:
@@ -218,7 +220,10 @@ def admin_upload_bead_image():
         abort(400, description="Файл больше 2 МБ")
 
     filename = f"bead_{uuid.uuid4().hex}{ext}"
-    file.save(os.path.join(_upload_dir, filename))
+    payload = file.read()
+    with open(os.path.join(_upload_dir, filename), "wb") as out:
+        out.write(payload)
+    store.save_upload(filename, payload, "image/png" if ext == ".png" else "image/webp")
     return jsonify({"url": f"/uploads/{filename}"}), 201
 
 
