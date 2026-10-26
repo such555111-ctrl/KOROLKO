@@ -9,9 +9,10 @@ from flask import Blueprint, Response, jsonify, request
 from sqlalchemy import select
 
 from madebar_config import (
-    BASE_PRICE, MAX_BEADS, RATE_LIMIT_ORDERS, RATE_LIMIT_WINDOW_SEC,
+    BASE_PRICE, HARDWARE_CATEGORIES, JEWELRY_TYPES, MAX_BEADS,
+    RATE_LIMIT_ORDERS, RATE_LIMIT_WINDOW_SEC,
 )
-from models import Bead, CustomOrder, SessionLocal
+from models import Bead, CustomOrder, Hardware, SessionLocal
 
 log = logging.getLogger("korolko.beadbar")
 
@@ -54,6 +55,27 @@ def _clean_phone(raw: str):
     if not 10 <= len(digits) <= 15:
         return None
     return ("+" if raw.startswith("+") else "") + digits
+
+
+def _thread_color(b):
+    """Цвет круга на нити. Если админ его не задал, берём цвет нарисованной бусины
+    (/beadart/gem.svg?c=9a6bd1); для загруженного фото без цвета остаётся None (нейтральный круг)."""
+    if b.bead_color:
+        return b.bead_color
+    url = b.image_url or ""
+    if not url.startswith("/beadart/"):
+        return None
+    try:
+        import bead_art
+        from urllib.parse import parse_qs, urlparse
+        u = urlparse(url)
+        kind = u.path.rsplit("/", 1)[-1].replace(".svg", "")
+        c = (parse_qs(u.query).get("c") or [""])[0].lstrip("#").lower()
+        if bead_art.HEX_RE.match(c):
+            return "#" + c
+        return "#" + bead_art.KINDS[kind][0]
+    except Exception:
+        return None
 
 
 def _fmt_num(x: float) -> str:
@@ -104,6 +126,24 @@ def _validate_order(data: dict):
     if not all(isinstance(i, int) and not isinstance(i, bool) and i > 0 for i in ids):
         return None, "beads_ids должен быть массивом положительных целых чисел"
 
+    # Тип и размер: обязательны (клиент должен выбрать размер до оформления)
+    jtype = str(data.get("jewelry_type") or "").strip()
+    if jtype not in JEWELRY_TYPES:
+        return None, "Выберите тип украшения: браслет или колье"
+    try:
+        size_cm = float(data.get("size_cm"))
+    except (TypeError, ValueError):
+        return None, "Выберите размер украшения"
+    if size_cm not in [float(x) for x in JEWELRY_TYPES[jtype]["sizes"]]:
+        return None, "Выберите размер из доступных для этого типа украшения"
+
+    # Фурнитура необязательна: либо null, либо id активной позиции
+    hw_id = data.get("hardware_id")
+    if hw_id in (None, ""):
+        hw_id = None
+    elif not isinstance(hw_id, int) or isinstance(hw_id, bool) or hw_id <= 0:
+        return None, "Некорректная фурнитура"
+
     try:
         client_total = float(data.get("total_price"))
     except (TypeError, ValueError):
@@ -113,8 +153,17 @@ def _validate_order(data: dict):
         "customer_name": name, "customer_phone": phone, "delivery_type": delivery,
         "address": address, "comment": comment, "beads_ids": ids,
         "client_total": client_total,
+        "jewelry_type": jtype, "size_cm": size_cm, "hardware_id": hw_id,
         "customer_chat_id": chat_id, "customer_username": username,
     }, None
+
+
+def _size_text(order) -> str:
+    """«Браслет, 17 см» (пусто у старых заказов без размера)."""
+    t = JEWELRY_TYPES.get(order.jewelry_type or "")
+    if not t or not order.size_cm:
+        return ""
+    return f"{t['label']}, {_fmt_num(order.size_cm)} см"
 
 
 def _build_recipe(order: CustomOrder, beads_by_id: dict) -> str:
@@ -137,6 +186,15 @@ def _build_recipe(order: CustomOrder, beads_by_id: dict) -> str:
     if order.customer_username:
         lines.append(f"✈️ @{esc(order.customer_username)}")
 
+    size_text = _size_text(order)
+    if size_text:
+        lines.append(f"📏 <b>{esc(size_text)}</b>")
+    if order.hardware_name:
+        lines.append(
+            f"🔩 Фурнитура: <b>{esc(order.hardware_name)}</b> "
+            f"({esc(order.hardware_category or '')}, {_fmt_num(order.hardware_price or 0)} ₽)"
+        )
+
     lines += ["", f"<b>Рецепт сборки</b> (слева направо, {len(seq)} шт., бусины ≈ {total_mm / 10:.1f} см):"]
     for pos, bead_id in enumerate(seq, start=1):
         b = beads_by_id[bead_id]
@@ -147,6 +205,8 @@ def _build_recipe(order: CustomOrder, beads_by_id: dict) -> str:
         b = beads_by_id[bead_id]
         lines.append(f"• {esc(b.name)} × {qty} = {_fmt_num(b.price * qty)} ₽")
     lines.append(f"• Основа (шнурок + застёжка) = {_fmt_num(BASE_PRICE)} ₽")
+    if order.hardware_name:
+        lines.append(f"• Фурнитура: {esc(order.hardware_name)} = {_fmt_num(order.hardware_price or 0)} ₽")
 
     lines += ["", f"💰 <b>Итого: {_fmt_num(order.total_price)} ₽</b>"]
     return "\n".join(lines)
@@ -168,7 +228,10 @@ def _notify_admins(text: str) -> None:
 
 @bead_bp.route("/api/madebar/config", methods=["GET"])
 def get_config():
-    resp = jsonify({"base_price": BASE_PRICE, "max_beads": MAX_BEADS})
+    resp = jsonify({
+        "base_price": BASE_PRICE, "max_beads": MAX_BEADS,
+        "types": [{"id": k, "label": v["label"], "sizes": v["sizes"]} for k, v in JEWELRY_TYPES.items()],
+    })
     resp.headers["Cache-Control"] = "no-cache"
     return resp
 
@@ -185,9 +248,31 @@ def get_beads():
         grouped.setdefault(b.category, []).append({
             "id": b.id, "name": b.name, "category": b.category,
             "image_url": b.image_url, "price": b.price, "size_mm": b.size_mm,
+            "bead_color": _thread_color(b),
         })
     # Не через jsonify: он сортирует ключи по алфавиту, а нам нужен порядок категорий
     # по sort_order (иначе табы в конструкторе встанут в алфавитном порядке).
+    resp = Response(json.dumps(grouped, ensure_ascii=False), mimetype="application/json")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@bead_bp.route("/api/hardware", methods=["GET"])
+def get_hardware():
+    """Активная фурнитура по категориям (Серебро, Золото); пустые категории не отдаём."""
+    session = SessionLocal()
+    rows = session.scalars(
+        select(Hardware).where(Hardware.is_active.is_(True)).order_by(Hardware.id)
+    ).all()
+    grouped = {cat: [] for cat in HARDWARE_CATEGORIES}
+    for h in rows:
+        if h.category in grouped:
+            grouped[h.category].append({
+                "id": h.id, "name": h.name, "category": h.category,
+                "image_url": h.image_url, "price": h.price,
+            })
+    grouped = {cat: items for cat, items in grouped.items() if items}
+    # Не через jsonify: нужен порядок категорий (Серебро, потом Золото)
     resp = Response(json.dumps(grouped, ensure_ascii=False), mimetype="application/json")
     resp.headers["Cache-Control"] = "no-cache"
     return resp
@@ -218,8 +303,19 @@ def create_custom_order():
     if missing:
         return _error("Некоторые бусины закончились или были убраны. Обновите конструктор.")
 
+    # Фурнитура (если выбрана) должна быть активной
+    hardware = None
+    if clean["hardware_id"] is not None:
+        hardware = session.scalars(
+            select(Hardware).where(Hardware.id == clean["hardware_id"], Hardware.is_active.is_(True))
+        ).first()
+        if hardware is None:
+            return _error("Выбранная фурнитура недоступна. Обновите конструктор и выберите другую.")
+
     # Цену считаем на сервере: клиенту доверять нельзя
-    server_total = round(BASE_PRICE + sum(beads_by_id[i].price for i in ids), 2)
+    server_total = round(
+        BASE_PRICE + sum(beads_by_id[i].price for i in ids) + (hardware.price if hardware else 0), 2
+    )
     if abs(server_total - clean["client_total"]) > PRICE_TOLERANCE:
         log.warning("Расхождение цены: клиент=%s, сервер=%s", clean["client_total"], server_total)
         return _error(
@@ -234,6 +330,11 @@ def create_custom_order():
         comment=clean["comment"], beads_sequence=ids, total_price=server_total,
         customer_chat_id=clean["customer_chat_id"],
         customer_username=clean["customer_username"],
+        jewelry_type=clean["jewelry_type"], size_cm=clean["size_cm"],
+        hardware_id=hardware.id if hardware else None,
+        hardware_name=hardware.name if hardware else None,
+        hardware_category=hardware.category if hardware else None,
+        hardware_price=hardware.price if hardware else None,
         status="new",
     )
     try:
@@ -269,6 +370,10 @@ def customer_madebar_orders(tg_id: int) -> list:
         for bead_id, qty in Counter(o.beads_sequence or []).items():
             b = beads.get(bead_id)
             items.append({"name": b.name if b else f"Бусина №{bead_id}", "qty": qty})
+        if o.hardware_name:
+            items.append({"name": f"Фурнитура: {o.hardware_name} ({o.hardware_category or ''})", "qty": 1})
+        if _size_text(o):
+            items.append({"name": f"Размер: {_size_text(o)}", "qty": 1})
         result.append({
             "id": o.id, "kind": "madebar", "number": f"MB-{o.id}",
             "created_at": o.to_dict()["created_at"],

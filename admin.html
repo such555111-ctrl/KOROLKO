@@ -192,6 +192,24 @@
   .card-sub{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;}
   .card-actions{display:flex;gap:8px;margin-top:12px;position:relative;z-index:1;}
   .card-actions .btn-outline{padding:8px 14px;font-size:10px;}
+  .order-col{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    flex:0 0 auto;position:relative;z-index:2;
+  }
+  .order-num{
+    min-width:28px;height:22px;padding:0 6px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-heading);font-size:11px;font-weight:700;color:var(--accent);
+    background:var(--accent-dim);border:1px solid rgba(217,96,138,.25);
+  }
+  .order-btn{
+    width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    background:transparent;border:1.5px solid var(--line);color:var(--text);cursor:pointer;padding:0;
+    transition:all .2s var(--ease);
+  }
+  .order-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  .order-btn:active:not(:disabled){transform:scale(.92);}
+  .order-btn:disabled{opacity:.25;cursor:default;}
+  .field-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;}
 
   .fab{
     position:fixed;right:20px;bottom:24px;width:58px;height:58px;border-radius:50%;
@@ -348,9 +366,9 @@
 .tabs::-webkit-scrollbar{display:none;}
 .tab-btn{flex:1 0 auto;padding-left:14px;padding-right:14px;}
 
-.mb-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:6px;border-radius:14px;background:var(--bg-elev-2);}
+.mb-switch{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;margin-bottom:6px;border-radius:14px;background:var(--bg-elev-2);}
 .mb-switch button{
-  border:0;border-radius:11px;padding:11px 0;background:none;color:var(--muted);cursor:pointer;
+  border:0;border-radius:11px;padding:11px 2px;background:none;color:var(--muted);cursor:pointer;
   font:inherit;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;transition:all .2s var(--ease);
 }
 .mb-switch button.active{background:var(--bg-elev);color:var(--accent);box-shadow:0 4px 14px rgba(200,95,135,.15);}
@@ -367,6 +385,8 @@
 }
 .mb-thumb img{width:100%;height:100%;object-fit:contain;display:block;}
 .mb-info{flex:1;min-width:0;}
+.mb-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-left:6px;vertical-align:-1px;
+  border:1px solid rgba(0,0,0,.15);}
 .mb-info .card-title{overflow-wrap:anywhere;}
 .mb-actions{flex:1 0 100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .mb-actions .btn-outline,.mb-actions .btn-danger{padding:8px 12px;font-size:10px;}
@@ -396,6 +416,8 @@
 .bd-sw:active{transform:scale(.85);}
 .bd-sw.active{box-shadow:0 0 0 2.5px var(--accent);transform:scale(1.1);}
 .color-row{display:flex;align-items:center;gap:12px;margin-top:12px;}
+.thread-dot{flex:0 0 auto;width:30px;height:30px;border-radius:50%;border:1px solid rgba(0,0,0,.12);
+  box-shadow:inset 0 -2px 3px rgba(0,0,0,.13),inset 0 1px 2px rgba(255,255,255,.6),0 2px 3px rgba(120,40,70,.25);}
 .color-row input{width:56px;height:40px;padding:2px;border-radius:10px;flex:0 0 auto;cursor:pointer;}
 .mb-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
@@ -415,8 +437,13 @@
 .mb-order__total{margin-top:10px;font-weight:800;font-family:var(--font-heading);color:var(--accent);font-size:17px;}
 .mb-order .mb-actions{margin-top:10px;}
 
+.mb-order__spec{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;}
+.mb-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:var(--accent-dim);color:var(--accent);font-size:12px;font-weight:700;}
+.mb-chip img{width:20px;height:20px;border-radius:50%;object-fit:cover;}
+.mb-chip--warn{background:rgba(255,107,107,.1);color:var(--danger);}
+
 .mb-fail{margin:12px 0;padding:14px 16px;border-radius:14px;background:rgba(255,107,107,.1);border:1.5px solid var(--danger);color:var(--danger);font-size:13px;line-height:1.55;overflow-wrap:anywhere;}
-</style></style>
+</style>
 </head>
 <body>
 <div class="orb orb-1"></div>
@@ -496,6 +523,7 @@
     <button class="tab-btn" data-tab="questions">Вопросы<span class="tab-badge" id="questionsBadge" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="promos">Промокоды</button>
     <button class="tab-btn" data-tab="madebar">Made Bar</button>
+    <button class="tab-btn" data-tab="contacts">Контакты</button>
   </div>
   <div class="muted" id="countLabel"></div>
   <div id="list" style="margin-top:16px;"></div>
@@ -542,6 +570,10 @@
       <button type="button" class="badge-opt" data-badge="instock">В наличии</button>
     </div>
 
+    <label>Позиция в каталоге <span class="muted" style="text-transform:none;letter-spacing:0;">— необязательно</span></label>
+    <input type="number" id="fSort" min="1" step="1" inputmode="numeric" placeholder="В конец списка">
+    <div class="field-hint">Номер места во вкладке «Все»: 1 — самый первый товар. Пусто — новый товар встанет в конец. Остальные сдвинутся сами.</div>
+
     <label>Размеры (через запятую)</label>
     <input type="text" id="fSizes" placeholder="S, M, L, XL">
 
@@ -563,7 +595,18 @@
     <div class="muted" id="beadModalSub">прозрачный PNG, лучше квадратный</div>
 
     <div class="bead-stage"><img id="beadPreview" alt=""></div>
-    <div class="muted" id="beadCustomNote" style="text-align:center;margin-top:8px;display:none;">Сейчас стоит загруженная картинка. Выберите вид или цвет ниже, чтобы заменить её.</div>
+    <div class="muted" id="beadCustomNote" style="text-align:center;margin-top:8px;display:none;">Сейчас стоит своя картинка. Выберите вид или цвет ниже, чтобы вернуться к нарисованной бусине.</div>
+
+    <label>Своё фото бусины</label>
+    <div class="mb-two" style="grid-template-columns:auto 1fr;align-items:center;">
+      <button type="button" class="btn-outline" id="beadUploadBtn">Загрузить файл</button>
+      <span class="muted" id="beadUploadHint">PNG, WebP или JPG до 2 МБ, лучше квадратный PNG без фона</span>
+    </div>
+    <input type="file" id="beadFileInput" accept="image/png,image/webp,image/jpeg" style="display:none;">
+    <div class="mb-two" style="grid-template-columns:1fr auto;margin-top:8px;">
+      <input type="text" id="beadUrlInput" placeholder="или ссылка https://…/bead.png" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" class="btn-outline" id="beadUrlApply">Применить</button>
+    </div>
 
     <label>Вид</label>
     <div class="badge-picker" id="beadKindPicker"></div>
@@ -584,6 +627,15 @@
       <input type="color" id="beadColor" value="#9a6bd1" aria-label="Любой цвет">
       <span class="muted">или выберите любой цвет</span>
     </div>
+
+    <label>Цвет на нити <span class="muted" style="text-transform:none;letter-spacing:0;">— круг, которым бусина показывается на нити (в каталоге остаётся фото)</span></label>
+    <div class="bd-swatches" id="threadSwatches"></div>
+    <div class="color-row">
+      <input type="color" id="threadColorInput" value="#d9d4dc" aria-label="Цвет на нити">
+      <span class="thread-dot" id="threadDot" aria-hidden="true"></span>
+      <button type="button" class="btn-outline" id="threadColorReset">Нейтральный</button>
+    </div>
+    <div class="muted" id="threadColorNote" style="margin-top:6px;"></div>
 
     <label>Название</label>
     <input type="text" id="bName" maxlength="120" placeholder="Жемчуг барочный">
@@ -617,6 +669,48 @@
     <div class="modal-actions">
       <button class="btn-outline" id="beadCancelBtn">Отмена</button>
       <button class="btn" id="beadSaveBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="hwOverlay">
+  <div class="modal">
+    <div class="modal-title" id="hwModalTitle">Новая фурнитура</div>
+    <div class="muted" id="hwModalSub">фото, название, категория и цена</div>
+
+    <div class="bead-stage"><img id="hwPreview" alt="" style="display:none;"></div>
+
+    <label>Фото</label>
+    <div class="mb-two" style="grid-template-columns:auto 1fr;align-items:center;">
+      <button type="button" class="btn-outline" id="hwUploadBtn">Загрузить фото</button>
+      <span class="muted">PNG, WebP или JPG до 2 МБ</span>
+    </div>
+    <input type="file" id="hwFileInput" accept="image/png,image/webp,image/jpeg" style="display:none;">
+    <div class="mb-two" style="grid-template-columns:1fr auto;margin-top:8px;">
+      <input type="text" id="hwUrlInput" placeholder="или ссылка https://…/photo.jpg" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" class="btn-outline" id="hwUrlApply">Применить</button>
+    </div>
+
+    <label>Название</label>
+    <input type="text" id="hwName" maxlength="120" placeholder="Замок-карабин">
+
+    <label>Категория</label>
+    <div class="badge-picker" id="hwCatPicker"></div>
+
+    <label>Цена, ₽</label>
+    <input type="number" id="hwPrice" min="0" step="0.01" inputmode="decimal" placeholder="150">
+
+    <label>Статус</label>
+    <div class="badge-picker" id="hwActivePicker">
+      <button type="button" class="badge-opt" data-active="1">Активна</button>
+      <button type="button" class="badge-opt" data-active="0">Отключена</button>
+    </div>
+
+    <div class="error" id="hwFormError"></div>
+
+    <div class="modal-actions">
+      <button class="btn-outline" id="hwCancelBtn">Отмена</button>
+      <button class="btn" id="hwSaveBtn">Сохранить</button>
     </div>
   </div>
 </div>
@@ -767,7 +861,7 @@ async function enterApp(){
   await loadPromos();
 }
 
-const TAB_TITLES = { products:'Товары', orders:'Заказы', questions:'Вопросы', promos:'Промокоды', madebar:'Made Bar' };
+const TAB_TITLES = { products:'Товары', orders:'Заказы', questions:'Вопросы', promos:'Промокоды', madebar:'Made Bar', contacts:'Контакты' };
 
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.onclick = async () => {
@@ -788,12 +882,56 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     } else if (currentTab === 'madebar'){
       try { await loadMadeBar(); } catch(e){ showToast(e.message); }
       renderMadeBar();
+    } else if (currentTab === 'contacts'){
+      await renderContacts();
     } else {
       await loadPromos();
       renderPromos();
     }
   };
 });
+
+// --- Контакты («Связаться с нами») -------------------------------------
+
+async function renderContacts(){
+  const list = document.getElementById('list');
+  document.getElementById('countLabel').textContent = 'Ссылки для раздела «Связаться с нами» в магазине';
+  list.innerHTML = '<div class="muted">Загрузка…</div>';
+  let c;
+  try { c = await api('/api/admin/contacts'); }
+  catch(e){ list.innerHTML = ''; showToast(e.message); return; }
+  const esc = v => String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  list.innerHTML = `
+    <div class="card" style="display:block;cursor:default;">
+      <label style="margin-top:0;">Telegram</label>
+      <input type="text" id="cTelegram" value="${esc(c.telegram)}" placeholder="@ANTONINAKOROLKO или https://t.me/…" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <label>Instagram</label>
+      <input type="text" id="cInstagram" value="${esc(c.instagram)}" placeholder="https://www.instagram.com/… или @ник" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <label>TikTok</label>
+      <input type="text" id="cTiktok" value="${esc(c.tiktok)}" placeholder="https://www.tiktok.com/@… или @ник" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <div class="muted" style="margin-top:10px;">Можно вставить @ник или полную ссылку. Пустое поле — кнопка в магазине скрывается.</div>
+      <button class="btn" id="contactsSave" style="margin-top:16px;width:100%;">Сохранить</button>
+    </div>`;
+  document.getElementById('contactsSave').onclick = async (ev) => {
+    const btn = ev.currentTarget; btn.disabled = true;
+    try {
+      const saved = await api('/api/admin/contacts', {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          telegram: document.getElementById('cTelegram').value,
+          instagram: document.getElementById('cInstagram').value,
+          tiktok: document.getElementById('cTiktok').value,
+        })
+      });
+      document.getElementById('cTelegram').value = saved.telegram;
+      document.getElementById('cInstagram').value = saved.instagram;
+      document.getElementById('cTiktok').value = saved.tiktok;
+      showToast('Контакты сохранены');
+    } catch(e){ showToast(e.message); }
+    btn.disabled = false;
+  };
+}
 
 // --- List ------------------------------------------------------------
 
@@ -812,17 +950,24 @@ async function loadProducts(){
 
 function renderList(){
   const list = document.getElementById('list');
-  document.getElementById('countLabel').textContent = `${products.length} товар(ов)`;
+  document.getElementById('countLabel').textContent = `${products.length} товар(ов) · порядок как во вкладке «Все»`;
   if (products.length===0){
     list.innerHTML = '<div class="empty">Пока нет ни одного товара — нажмите «+», чтобы добавить.</div>';
     return;
   }
-  list.innerHTML = products.map(p => {
+  list.innerHTML = products.map((p, idx) => {
     const cover = (p.images && p.images.length) ? p.images[0] : p.image;
     const photoCount = (p.images && p.images.length) ? p.images.length : (p.image ? 1 : 0);
     const badgeTag = p.badge && BADGE_LABELS[p.badge] ? ` · <span style="color:var(--accent);">${BADGE_LABELS[p.badge]}</span>` : '';
+    const upOff = idx === 0 ? 'disabled' : '';
+    const downOff = idx === products.length - 1 ? 'disabled' : '';
     return `
     <div class="card">
+      <div class="order-col">
+        <button class="order-btn" data-up="${p.id}" ${upOff} aria-label="Выше" title="Выше"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+        <div class="order-num" title="Позиция в каталоге">${idx + 1}</div>
+        <button class="order-btn" data-down="${p.id}" ${downOff} aria-label="Ниже" title="Ниже"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
       <div class="thumb" style="${cover ? `background-image:url('${cover}')` : `background:${SWATCHES[p.swatch % SWATCHES.length]}`}"></div>
       <div class="card-body">
         <div class="card-title">${p.name || '(без названия)'}</div>
@@ -839,6 +984,23 @@ function renderList(){
   }).join('');
   list.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openModal(Number(b.dataset.edit)));
   list.querySelectorAll('[data-del]').forEach(b => b.onclick = () => deleteProduct(Number(b.dataset.del)));
+  list.querySelectorAll('[data-up]').forEach(b => b.onclick = () => moveProduct(Number(b.dataset.up), 'up'));
+  list.querySelectorAll('[data-down]').forEach(b => b.onclick = () => moveProduct(Number(b.dataset.down), 'down'));
+}
+
+let moving = false;
+async function moveProduct(id, direction){
+  if (moving) return;
+  moving = true;
+  try {
+    products = await api(`/api/admin/products/${id}/move`, {
+      method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ direction })
+    });
+    renderList();
+    const el = document.querySelector(`[data-edit="${id}"]`)?.closest('.card');
+    if (el) el.scrollIntoView({ block:'nearest', behavior:'smooth' });
+  } catch(e){ showToast(e.message); }
+  finally { moving = false; }
 }
 
 async function deleteProduct(id){
@@ -1214,6 +1376,7 @@ function openModal(id){
   document.getElementById('fPrice').value = p?.price || '';
   document.getElementById('fOldPrice').value = p?.old_price || '';
   document.getElementById('fSizes').value = (p?.sizes||[]).join(', ');
+  document.getElementById('fSort').value = p ? (products.findIndex(x=>x.id===p.id) + 1) : '';
   document.getElementById('fDesc').value = p?.desc || '';
   selectedSwatch = p?.swatch || 0;
   selectedBadge = p?.badge || '';
@@ -1232,7 +1395,7 @@ document.getElementById('cancelBtn').onclick = closeModal;
 document.getElementById('overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeModal(); });
 document.getElementById('addBtn').onclick = () => {
   if (currentTab === 'promos') openPromoModal(null);
-  else if (currentTab === 'madebar') openBeadModal(null);
+  else if (currentTab === 'madebar') { if (mbView === 'hardware') openHardwareModal(null); else openBeadModal(null); }
   else openModal(null);
 };
 
@@ -1309,7 +1472,8 @@ document.getElementById('saveBtn').onclick = async () => {
     return;
   }
 
-  const payload = { name, category, price, old_price: oldPrice, badge: selectedBadge, sizes, desc, swatch: selectedSwatch, images: uploadedImages };
+  const sortOrder = document.getElementById('fSort').value.trim();
+  const payload = { name, category, price, old_price: oldPrice, badge: selectedBadge, sizes, desc, swatch: selectedSwatch, images: uploadedImages, sort_order: sortOrder };
   const btn = document.getElementById('saveBtn');
   btn.disabled = true;
   try {
@@ -1317,17 +1481,14 @@ document.getElementById('saveBtn').onclick = async () => {
       const updated = await api(`/api/admin/products/${editingId}`, {
         method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload)
       });
-      products = products.map(p => p.id===editingId ? updated : p);
       showToast('Товар обновлён');
     } else {
       const created = await api('/api/admin/products', {
         method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload)
       });
-      products.push(created);
       showToast('Товар добавлен');
     }
-    renderList();
-    updateStats();
+    await loadProducts();   // перечитываем список: порядок мог измениться
     closeModal();
   } catch(e){
     document.getElementById('formError').textContent = e.message;
@@ -1338,8 +1499,10 @@ document.getElementById('saveBtn').onclick = async () => {
 
 // --- Made Bar: бусины и заказы ------------------------------------------
 
-let mbView = 'beads';            // 'beads' | 'orders'
+let mbView = 'beads';            // 'beads' | 'hardware' | 'orders'
 let beads = [];
+let hardwareItems = [];
+let hardwareCategories = ['Серебро', 'Золото'];
 let beadCategories = [];
 let mbOrders = [];
 let editingBeadId = null;
@@ -1352,7 +1515,7 @@ const JSON_HDR = { 'Content-Type': 'application/json' };
 const fmtMm = n => Number(Number(n || 0).toFixed(1)).toLocaleString('ru-RU');
 
 function updateAddBtn(){
-  const show = currentTab === 'products' || currentTab === 'promos' || (currentTab === 'madebar' && mbView === 'beads');
+  const show = currentTab === 'products' || currentTab === 'promos' || (currentTab === 'madebar' && (mbView === 'beads' || mbView === 'hardware'));
   document.getElementById('addBtn').style.display = show ? 'flex' : 'none';
 }
 
@@ -1365,6 +1528,10 @@ async function loadMadeBar(){
       const r = await api('/api/admin/beads');
       beads = r.beads;
       beadCategories = r.categories;
+    } else if (mbView === 'hardware'){
+      const r = await api('/api/admin/hardware');
+      hardwareItems = r.hardware;
+      hardwareCategories = r.categories || hardwareCategories;
     } else {
       mbOrders = await api('/api/admin/custom-orders');
     }
@@ -1385,11 +1552,12 @@ function renderMadeBar(){
   const sw = `
     <div class="mb-switch">
       <button data-mbview="beads" class="${mbView === 'beads' ? 'active' : ''}">Бусины</button>
-      <button data-mbview="orders" class="${mbView === 'orders' ? 'active' : ''}">Заказы сборок</button>
+      <button data-mbview="hardware" class="${mbView === 'hardware' ? 'active' : ''}">Фурнитура</button>
+      <button data-mbview="orders" class="${mbView === 'orders' ? 'active' : ''}">Заказы</button>
     </div>`;
   const fail = mbError
     ? `<div class="mb-fail"><b>Made Bar не запустился</b><br>${escB(mbError)}</div>` : '';
-  list.innerHTML = sw + fail + (mbView === 'beads' ? beadsHTML() : mbOrdersHTML());
+  list.innerHTML = sw + fail + (mbView === 'beads' ? beadsHTML() : mbView === 'hardware' ? hardwareHTML() : mbOrdersHTML());
 
   list.querySelectorAll('[data-mbview]').forEach(b => b.onclick = async () => {
     if (b.dataset.mbview === mbView) return;
@@ -1399,7 +1567,7 @@ function renderMadeBar(){
     renderMadeBar();
   });
 
-  if (mbView === 'beads') wireBeads(list); else wireMbOrders(list);
+  if (mbView === 'beads') wireBeads(list); else if (mbView === 'hardware') wireHardware(list); else wireMbOrders(list);
   updateAddBtn();
 }
 
@@ -1411,7 +1579,7 @@ function beadRowHTML(b){
     <div class="mb-thumb"><img src="${escB(b.image_url)}" alt="" loading="lazy"></div>
     <div class="mb-info">
       <div class="card-title">${escB(b.name)}</div>
-      <div class="card-sub">${fmt(b.price)} за шт. · ${fmtMm(b.size_mm)} мм${used}</div>
+      <div class="card-sub">${fmt(b.price)} за шт. · ${fmtMm(b.size_mm)} мм${used}${/^#[0-9a-f]{6}$/i.test(b.bead_color || '') ? `<span class="mb-dot" style="background:${b.bead_color}" title="Цвет на нити"></span>` : ''}</div>
     </div>
     <div class="mb-actions">
       <label class="sw">
@@ -1488,6 +1656,41 @@ const BEAD_SWATCHES = ['f08db0','d9608a','d94452','f0a35e','f1d58a','a8d672','2f
 
 let beadKind = 'gem', beadVariant = 'plain', beadColor = '9a6bd1', beadLetter = '';
 let beadUseArt = true;     // false: у редактируемой бусины стоит старая загруженная картинка
+let threadColor = '';          // цвет круга на нити, 'rrggbb' без #; '' = нейтральный
+let threadColorManual = false; // true: админ выбрал цвет сам, он не меняется вслед за цветом картинки
+let threadColorTouched = false; // true: админ менял цвет в этой сессии формы (тогда новое фото его не перезаписывает)
+const THREAD_NEUTRAL = 'd9d4dc';
+
+function renderThreadColor(){
+  const shown = threadColor || THREAD_NEUTRAL;
+  document.getElementById('threadSwatches').innerHTML = BEAD_SWATCHES.map(c =>
+    `<button type="button" class="bd-sw ${c === threadColor ? 'active' : ''}" data-tcolor="${c}" style="background:#${c}" aria-label="#${c}"></button>`).join('');
+  document.getElementById('threadColorInput').value = '#' + shown;
+  document.getElementById('threadDot').style.background =
+    `radial-gradient(circle at 34% 30%,#fff 0,#${shown} 55%,#${shown} 100%)`;
+  document.getElementById('threadColorNote').textContent = threadColor
+    ? (threadColorManual ? 'Цвет выбран вручную.'
+       : (beadUseArt ? 'Совпадает с цветом бусины; меняется вместе с ним, пока вы не выберете свой.'
+                     : 'Подобран автоматически по фото. Если не подходит, выберите свой.'))
+    : 'Цвет не задан: на нити будет нейтральный круг.';
+  document.querySelectorAll('#threadSwatches [data-tcolor]').forEach(b => b.onclick = () => {
+    threadColor = b.dataset.tcolor; threadColorManual = true; threadColorTouched = true; renderThreadColor();
+  });
+}
+// пока админ не выбрал цвет круга сам, он повторяет цвет нарисованной бусины
+function syncThreadColor(){
+  if (!threadColorManual && beadUseArt) threadColor = beadColor;
+  renderThreadColor();
+}
+document.getElementById('threadColorInput').addEventListener('input', ev => {
+  threadColor = ev.target.value.replace('#', '').toLowerCase(); threadColorManual = true; threadColorTouched = true;
+  document.getElementById('threadDot').style.background = `radial-gradient(circle at 34% 30%,#fff 0,#${threadColor} 55%,#${threadColor} 100%)`;
+  document.querySelectorAll('#threadSwatches .bd-sw').forEach(s => s.classList.toggle('active', s.dataset.tcolor === threadColor));
+  document.getElementById('threadColorNote').textContent = 'Цвет выбран вручную.';
+});
+document.getElementById('threadColorReset').onclick = () => {
+  threadColor = ''; threadColorManual = true; threadColorTouched = true; renderThreadColor();
+};
 
 const $beadOverlay = document.getElementById('beadOverlay');
 const $beadPreview = document.getElementById('beadPreview');
@@ -1539,6 +1742,7 @@ function renderBeadBuilder(){
 
   $beadPreview.src = beadUseArt ? beadArtUrl() : beadExistingUrl;
   document.getElementById('beadCustomNote').style.display = beadUseArt ? 'none' : '';
+  syncThreadColor();
 
   document.querySelectorAll('#beadKindPicker [data-kind]').forEach(b => b.onclick = () => {
     const wasDefault = beadColor === BEAD_KINDS[beadKind].color;
@@ -1561,6 +1765,7 @@ $beadColor.addEventListener('input', () => {
   $beadPreview.src = beadArtUrl();
   document.getElementById('beadCustomNote').style.display = 'none';
   document.querySelectorAll('#beadSwatches .bd-sw').forEach(s => s.classList.toggle('active', s.dataset.color === beadColor));
+  syncThreadColor();
 });
 $bLetter.addEventListener('input', () => {
   beadLetter = $bLetter.value.trim().slice(0, 1).toUpperCase();
@@ -1586,12 +1791,90 @@ function renderBeadActivePicker(){
 document.querySelectorAll('#beadActivePicker .badge-opt').forEach(btn =>
   btn.onclick = () => { beadAvailable = btn.dataset.active === '1'; renderBeadActivePicker(); });
 
+// --- Своё фото бусины: загрузка файла или ссылка ---
+// средний цвет бусины по фото: берём центр кадра, пропускаем прозрачный и почти белый фон
+function photoAverageColor(url){
+  return new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const S = 40, cv = document.createElement('canvas');
+        cv.width = cv.height = S;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, S, S);
+        const d = ctx.getImageData(S * 0.25, S * 0.25, S * 0.5, S * 0.5).data;
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4){
+          if (d[i + 3] < 200) continue;
+          if (d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235) continue;
+          r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+        }
+        if (!n) return resolve('');
+        resolve([r, g, b].map(v => Math.round(v / n).toString(16).padStart(2, '0')).join(''));
+      } catch(e){ resolve(''); }     // чужая ссылка без CORS: цвет выберут вручную
+    };
+    img.onerror = () => resolve('');
+    img.src = url;
+  });
+}
+
+async function setCustomBeadImage(url){
+  beadExistingUrl = url;
+  beadUseArt = false;
+  renderBeadBuilder();
+  if (threadColorTouched) return;
+  const guess = await photoAverageColor(url);
+  if (guess && beadExistingUrl === url && !beadUseArt && !threadColorTouched){
+    threadColor = guess; threadColorManual = false;
+    renderThreadColor();
+  }
+}
+document.getElementById('beadUploadBtn').onclick = () => document.getElementById('beadFileInput').click();
+document.getElementById('beadFileInput').onchange = async (ev) => {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  const err = document.getElementById('beadFormError');
+  const btn = document.getElementById('beadUploadBtn');
+  err.textContent = '';
+  if (file.size > 2 * 1024 * 1024){ err.textContent = 'Файл больше 2 МБ'; return; }
+  btn.disabled = true; btn.textContent = 'Загружаем…';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await api('/api/admin/beads/upload', { method:'POST', body: fd });
+    document.getElementById('beadUrlInput').value = '';
+    setCustomBeadImage(r.url);
+  } catch(e){
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Загрузить файл';
+  }
+};
+document.getElementById('beadUrlApply').onclick = () => {
+  const err = document.getElementById('beadFormError');
+  const url = document.getElementById('beadUrlInput').value.trim();
+  err.textContent = '';
+  if (!/^https:\/\/[^\s<>"']+$/i.test(url) || url.length > 500){
+    err.textContent = 'Ссылка должна начинаться с https:// и не содержать пробелов';
+    return;
+  }
+  setCustomBeadImage(url);
+};
+$beadPreview.addEventListener('error', () => {
+  if (!beadUseArt) document.getElementById('beadFormError').textContent = 'Картинка не открывается: проверьте ссылку или загрузите файл';
+});
+$beadPreview.addEventListener('load', () => {
+  if (!beadUseArt) document.getElementById('beadFormError').textContent = '';
+});
+
 function openBeadModal(id){
   editingBeadId = id || null;
   const b = id ? beads.find(x => x.id === id) : null;
   document.getElementById('beadFormError').textContent = '';
   document.getElementById('beadModalTitle').textContent = b ? 'Изменить бусину' : 'Новая бусина';
-  document.getElementById('beadModalSub').textContent = b ? b.name : 'выберите вид и цвет, бусина нарисуется сама';
+  document.getElementById('beadModalSub').textContent = b ? b.name : 'нарисуйте бусину или загрузите своё фото';
   $bName.value = b?.name || '';
   $bCategory.value = b?.category || '';
   document.getElementById('bPrice').value = b?.price ?? '';
@@ -1602,7 +1885,12 @@ function openBeadModal(id){
   beadKind = 'gem'; beadVariant = 'plain'; beadColor = BEAD_KINDS.gem.color; beadLetter = '';
   beadExistingUrl = b?.image_url || '';
   beadUseArt = !b || parseArtUrl(beadExistingUrl);   // загруженную картинку оставляем, пока не тронут вид/цвет
+  // цвет на нити: у существующей бусины берём сохранённый (даже пустой), у новой — следуем цвету картинки
+  threadColorManual = Boolean(b);
+  threadColorTouched = false;
+  threadColor = b ? (String(b.bead_color || '').replace('#', '').toLowerCase() || (beadUseArt ? beadColor : '')) : '';
 
+  document.getElementById('beadUrlInput').value = (!beadUseArt && /^https:/i.test(beadExistingUrl)) ? beadExistingUrl : '';
   beadAvailable = b ? b.is_active : true;
   renderBeadBuilder();
   renderBeadActivePicker();
@@ -1634,6 +1922,7 @@ document.getElementById('beadSaveBtn').onclick = async () => {
     const payload = {
       name, category, price, size_mm: size, is_active: beadAvailable,
       image_url: beadUseArt ? beadArtUrl() : beadExistingUrl,
+      bead_color: threadColor ? '#' + threadColor : '',
     };
     if (sort !== '') payload.sort_order = Number(sort);
 
@@ -1651,13 +1940,178 @@ document.getElementById('beadSaveBtn').onclick = async () => {
   }
 };
 
+// ----- Фурнитура -----
+let editingHwId = null;
+let hwCategory = 'Серебро';
+let hwAvailable = true;
+let hwImageUrl = '';
+
+function hardwareRowHTML(h){
+  return `
+  <div class="mb-row ${h.is_active ? '' : 'is-off'}">
+    <div class="mb-thumb"><img src="${escB(h.image_url)}" alt="" loading="lazy"></div>
+    <div class="mb-info">
+      <div class="card-title">${escB(h.name)}</div>
+      <div class="card-sub">${fmt(h.price)}${h.is_active ? '' : ' · отключена'}</div>
+    </div>
+    <div class="mb-actions">
+      <label class="sw">
+        <input type="checkbox" data-hw-off="${h.id}" ${h.is_active ? '' : 'checked'}>
+        <span class="sw-track"></span><span>Отключена</span>
+      </label>
+      <button class="btn-outline" data-hw-edit="${h.id}">Изменить</button>
+    </div>
+  </div>`;
+}
+
+function hardwareHTML(){
+  const off = hardwareItems.filter(h => !h.is_active).length;
+  document.getElementById('countLabel').textContent =
+    `${hardwareItems.length} позиций фурнитуры` + (off ? ` · отключено: ${off}` : '');
+  if (!hardwareItems.length) return '<div class="empty">Фурнитуры пока нет. Нажмите «+», чтобы добавить первую.</div>';
+  return hardwareCategories.map(cat => {
+    const items = hardwareItems.filter(h => h.category === cat);
+    if (!items.length) return '';
+    return `<div class="mb-group">${escB(cat)}<span>${items.length}</span></div>` + items.map(hardwareRowHTML).join('');
+  }).join('');
+}
+
+function wireHardware(list){
+  list.querySelectorAll('[data-hw-off]').forEach(el =>
+    el.onchange = () => toggleHardware(Number(el.dataset.hwOff), el.checked));
+  list.querySelectorAll('[data-hw-edit]').forEach(el =>
+    el.onclick = () => openHardwareModal(Number(el.dataset.hwEdit)));
+}
+
+// «Отключена» включён => is_active = false (в конструкторе позиция пропадает)
+async function toggleHardware(id, disabled){
+  try {
+    const u = await api(`/api/admin/hardware/${id}`, { method:'PUT', headers: JSON_HDR, body: JSON.stringify({ is_active: !disabled }) });
+    hardwareItems = hardwareItems.map(h => h.id === id ? { ...h, ...u } : h);
+    showToast(disabled ? 'Фурнитура отключена' : 'Фурнитура снова доступна');
+  } catch(e){
+    showToast(e.message);
+  } finally {
+    renderMadeBar();   // при ошибке тумблер вернётся в реальное состояние
+  }
+}
+
+const $hwOverlay = document.getElementById('hwOverlay');
+const $hwPreview = document.getElementById('hwPreview');
+
+function renderHwModal(){
+  document.getElementById('hwCatPicker').innerHTML = hardwareCategories.map(c =>
+    `<button type="button" class="badge-opt ${c === hwCategory ? 'active' : ''}" data-hwcat="${escB(c)}">${escB(c)}</button>`).join('');
+  document.querySelectorAll('#hwCatPicker [data-hwcat]').forEach(b =>
+    b.onclick = () => { hwCategory = b.dataset.hwcat; renderHwModal(); });
+  document.querySelectorAll('#hwActivePicker .badge-opt').forEach(btn =>
+    btn.classList.toggle('active', (btn.dataset.active === '1') === hwAvailable));
+  if (hwImageUrl){ $hwPreview.src = hwImageUrl; $hwPreview.style.display = ''; }
+  else { $hwPreview.removeAttribute('src'); $hwPreview.style.display = 'none'; }
+}
+document.querySelectorAll('#hwActivePicker .badge-opt').forEach(btn =>
+  btn.onclick = () => { hwAvailable = btn.dataset.active === '1'; renderHwModal(); });
+
+function openHardwareModal(id){
+  editingHwId = id || null;
+  const h = id ? hardwareItems.find(x => x.id === id) : null;
+  document.getElementById('hwFormError').textContent = '';
+  document.getElementById('hwModalTitle').textContent = h ? 'Изменить фурнитуру' : 'Новая фурнитура';
+  document.getElementById('hwModalSub').textContent = h ? h.name : 'фото, название, категория и цена';
+  document.getElementById('hwName').value = h?.name || '';
+  document.getElementById('hwPrice').value = h?.price ?? '';
+  document.getElementById('hwUrlInput').value = (h && /^https:/i.test(h.image_url)) ? h.image_url : '';
+  hwCategory = h?.category || hardwareCategories[0];
+  hwAvailable = h ? h.is_active : true;
+  hwImageUrl = h?.image_url || '';
+  renderHwModal();
+  $hwOverlay.classList.add('open');
+}
+function closeHardwareModal(){ $hwOverlay.classList.remove('open'); }
+document.getElementById('hwCancelBtn').onclick = closeHardwareModal;
+$hwOverlay.addEventListener('click', e => { if (e.target.id === 'hwOverlay') closeHardwareModal(); });
+
+document.getElementById('hwUploadBtn').onclick = () => document.getElementById('hwFileInput').click();
+document.getElementById('hwFileInput').onchange = async (ev) => {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  const err = document.getElementById('hwFormError');
+  const btn = document.getElementById('hwUploadBtn');
+  err.textContent = '';
+  if (file.size > 2 * 1024 * 1024){ err.textContent = 'Файл больше 2 МБ'; return; }
+  btn.disabled = true; btn.textContent = 'Загружаем…';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await api('/api/admin/beads/upload', { method:'POST', body: fd });   // тот же загрузчик картинок
+    document.getElementById('hwUrlInput').value = '';
+    hwImageUrl = r.url;
+    renderHwModal();
+  } catch(e){
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Загрузить фото';
+  }
+};
+document.getElementById('hwUrlApply').onclick = () => {
+  const err = document.getElementById('hwFormError');
+  const url = document.getElementById('hwUrlInput').value.trim();
+  err.textContent = '';
+  if (!/^https:\/\/[^\s<>"']+$/i.test(url) || url.length > 500){
+    err.textContent = 'Ссылка должна начинаться с https:// и не содержать пробелов';
+    return;
+  }
+  hwImageUrl = url;
+  renderHwModal();
+};
+$hwPreview.addEventListener('error', () => {
+  if (hwImageUrl) document.getElementById('hwFormError').textContent = 'Фото не открывается: проверьте ссылку или загрузите файл';
+});
+$hwPreview.addEventListener('load', () => { document.getElementById('hwFormError').textContent = ''; });
+
+document.getElementById('hwSaveBtn').onclick = async () => {
+  const err = document.getElementById('hwFormError');
+  err.textContent = '';
+  const name = document.getElementById('hwName').value.trim();
+  const price = parseFloat(document.getElementById('hwPrice').value.replace(',', '.'));
+
+  if (!hwImageUrl){ err.textContent = 'Добавьте фото фурнитуры'; return; }
+  if (!name){ err.textContent = 'Введите название'; return; }
+  if (!Number.isFinite(price) || price < 0){ err.textContent = 'Укажите цену (0 или больше)'; return; }
+
+  const btn = document.getElementById('hwSaveBtn');
+  btn.disabled = true; btn.textContent = 'Сохраняем…';
+  try {
+    const payload = { name, category: hwCategory, price, is_active: hwAvailable, image_url: hwImageUrl };
+    await api(editingHwId ? `/api/admin/hardware/${editingHwId}` : '/api/admin/hardware', {
+      method: editingHwId ? 'PUT' : 'POST', headers: JSON_HDR, body: JSON.stringify(payload)
+    });
+    showToast(editingHwId ? 'Фурнитура обновлена' : 'Фурнитура добавлена');
+    closeHardwareModal();
+    await loadMadeBar();
+    renderMadeBar();
+  } catch(e){
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Сохранить';
+  }
+};
+
 // ----- Заказы сборок -----
 const MB_STATUS = { new:['Новый','status-new'], done:['Собран','status-done'], cancelled:['Отменён','status-cancelled'] };
+
+const MB_TYPES = { bracelet:'Браслет', necklace:'Колье' };
+function mbSizeText(o){
+  return (o.jewelry_type && o.size_cm) ? `${MB_TYPES[o.jewelry_type] || o.jewelry_type}, ${fmtMm(o.size_cm)} см` : '';
+}
 
 function mbRecipeText(o){
   const lines = [`Made Bar, заказ №${o.id}`, `${o.customer_name}, ${o.customer_phone}`,
     o.delivery_type + (o.address ? ': ' + o.address : '')];
   if (o.comment) lines.push('Комментарий: ' + o.comment);
+  if (mbSizeText(o)) lines.push('Размер: ' + mbSizeText(o));
+  if (o.hardware_name) lines.push(`Фурнитура: ${o.hardware_name} (${o.hardware_category || ''}, ${fmt(o.hardware_price || 0)})`);
   lines.push('', 'Рецепт (слева направо):');
   o.items.forEach((i, n) => lines.push(`${n + 1}. ${i.name}${i.size_mm ? ' (' + fmtMm(i.size_mm) + ' мм)' : ''}`));
   lines.push('', 'Итого: ' + fmt(o.total_price));
@@ -1686,6 +2140,10 @@ function mbOrderHTML(o){
     <div class="mb-order__line"><b>${escB(o.customer_name)}</b> · <a href="tel:${escB(tel)}">${escB(o.customer_phone)}</a></div>
     <div class="mb-order__line">${escB(o.delivery_type)}${o.address ? ': ' + escB(o.address) : ''}</div>
     ${o.comment ? `<div class="mb-order__line muted">💬 ${escB(o.comment)}</div>` : ''}
+    <div class="mb-order__spec">
+      ${mbSizeText(o) ? `<span class="mb-chip">📏 ${escB(mbSizeText(o))}</span>` : '<span class="mb-chip mb-chip--warn">Размер не указан</span>'}
+      ${o.hardware_name ? `<span class="mb-chip">${o.hardware_image_url ? `<img src="${escB(o.hardware_image_url)}" alt="">` : '🔩'}${escB(o.hardware_name)} · ${escB(o.hardware_category || '')} · ${fmt(o.hardware_price || 0)}</span>` : ''}
+    </div>
     <div class="mb-strip">${strip}</div>
     <details>
       <summary>Рецепт сборки: ${o.items.length} шт., ≈ ${fmtMm(mm / 10)} см</summary>

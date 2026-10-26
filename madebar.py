@@ -14,6 +14,26 @@ _state = {"error": None}   # причина, если Made Bar не запуст
 _require_admin = None
 
 
+def _ensure_bead_color_column():
+    """Колонка beads.bead_color: create_all не добавляет колонки в уже существующую таблицу,
+    поэтому на рабочей базе добавляем её сами (безопасно повторять)."""
+    from sqlalchemy import inspect, text
+    from models import Bead, SessionLocal
+
+    if not hasattr(Bead, "bead_color"):
+        raise RuntimeError(
+            "В models.py у класса Bead нет поля bead_color. Добавьте "
+            "bead_color = Column(String(7), nullable=True) и 'bead_color' в Bead.to_dict()"
+        )
+    engine = SessionLocal().get_bind()
+    table = Bead.__table__.name
+    if "bead_color" in {c["name"] for c in inspect(engine).get_columns(table)}:
+        return
+    with engine.begin() as conn:
+        conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN bead_color VARCHAR(7)'))
+    log.info("Made Bar: в таблицу %s добавлена колонка bead_color", table)
+
+
 def _short_error(exc) -> str:
     """Краткое описание ошибки без паролей из строки подключения."""
     msg = f"{type(exc).__name__}: {exc}"
@@ -74,6 +94,7 @@ def setup_madebar(app, bot, admin_chat_ids, require_admin, upload_dir):
 
     try:
         init_db()
+        _ensure_bead_color_column()
         seed_if_empty()
     except Exception as exc:
         _state["error"] = "Ошибка базы данных: " + _short_error(exc)

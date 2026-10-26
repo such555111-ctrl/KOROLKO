@@ -114,9 +114,14 @@
     position:relative;z-index:1;flex:0 0 auto;margin-inline:-1px;cursor:pointer;touch-action:manipulation;
     transition:transform .15s var(--ease);
   }
-  .thread-bead img{
-    display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(120,40,70,.3));
+  /* бусина на нити: аккуратный круг цвета выбранной бусины (цвет приходит из bead_color) */
+  .bead-dot{
+    --bc:#d9d4dc;--bc-hi:#f4f1f5;--bc-lo:#b3adb8;--bc-ink:#5a4f5f;
+    display:grid;place-items:center;box-sizing:border-box;width:100%;height:100%;border-radius:50%;
+    background:radial-gradient(circle at 34% 30%,var(--bc-hi) 0,var(--bc) 46%,var(--bc-lo) 100%);
+    box-shadow:inset 0 -2px 3px rgba(0,0,0,.13),inset 0 1px 2px rgba(255,255,255,.6),0 3px 4px rgba(120,40,70,.28);
   }
+  .bead-dot b{font-family:var(--font-heading);font-weight:800;line-height:1;color:var(--bc-ink);pointer-events:none;}
   .thread-bead:active{transform:scale(.9);}
   .thread-bead.is-new{animation:bead-drop .36s var(--spring);}
   .thread-bead.is-landed{animation:bead-land .24s ease-out;}
@@ -248,7 +253,8 @@
     content:"";position:absolute;left:0;right:0;top:50%;height:2px;transform:translateY(-50%);
     background:linear-gradient(180deg,#eeb3c8,#c9658c);border-radius:2px;
   }
-  .mini__track img{position:relative;margin-inline:-.5px;filter:drop-shadow(0 2px 2px rgba(120,40,70,.25));}
+  .mini__track .bead-dot{position:relative;flex:0 0 auto;margin-inline:-.5px;width:auto;height:auto;
+    box-shadow:inset 0 -1px 2px rgba(0,0,0,.13),inset 0 1px 1px rgba(255,255,255,.6),0 2px 2px rgba(120,40,70,.25);}
   .summary{display:grid;gap:7px;padding:13px 15px;margin-bottom:16px;border-radius:16px;background:var(--card);border:1.5px solid var(--line);font-size:14px;}
   .summary__row{display:flex;justify-content:space-between;gap:8px;}
   .summary__row span{color:var(--muted);}
@@ -280,6 +286,41 @@
   }
   .segmented input:checked + span{color:#fff;background:linear-gradient(135deg,var(--accent-soft),var(--accent));box-shadow:0 4px 12px rgba(217,96,138,.3);}
   .segmented input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px;}
+  /* размер (чипы) */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chips label{display:block;}
+  .chips input{position:absolute;opacity:0;pointer-events:none;}
+  .chips span{
+    display:block;min-width:76px;padding:11px 16px;border-radius:12px;text-align:center;font-size:14px;font-weight:700;
+    color:var(--muted);background:var(--card-hover);border:1.5px solid transparent;cursor:pointer;
+    transition:all .2s var(--ease);
+  }
+  .chips input:checked + span{color:#fff;background:linear-gradient(135deg,var(--accent-soft),var(--accent));box-shadow:0 4px 12px rgba(217,96,138,.3);}
+  .chips input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px;}
+  .field.is-invalid .chips span{border-color:var(--danger);}
+  .size-note{margin:9px 0 0;padding:9px 12px;border-radius:10px;background:rgba(229,83,91,.08);color:var(--danger);font-size:12.5px;font-weight:600;line-height:1.4;}
+
+  /* фурнитура */
+  .hw-tabs{display:flex;gap:8px;margin-bottom:10px;}
+  .hw-tabs .tab{padding:8px 16px;}
+  .hw-grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));}
+  .hw-card{
+    appearance:none;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 6px 8px;
+    border:1.5px solid var(--line);border-radius:14px;background:var(--card);color:inherit;cursor:pointer;
+    touch-action:manipulation;transition:transform .15s var(--ease),border-color .2s,background .2s,box-shadow .2s;
+  }
+  .hw-card:active{transform:scale(.95);}
+  .hw-card__img{width:56px;height:56px;border-radius:12px;overflow:hidden;background:#fff0f4;display:grid;place-items:center;}
+  .hw-card__img img{width:100%;height:100%;object-fit:cover;}
+  .hw-card__name{
+    min-height:2.5em;text-align:center;font-size:12px;line-height:1.25;font-weight:600;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .hw-card__price{font-size:13px;font-weight:800;color:var(--accent);}
+  .hw-card[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 3px var(--accent-dim);}
+  .hw-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;font-size:12.5px;color:var(--muted);}
+  .hw-status button{border:0;background:none;padding:0;color:var(--accent);font-weight:800;font-size:12.5px;cursor:pointer;}
+
   .form-error{margin:0 0 13px;padding:11px 13px;border-radius:12px;background:rgba(229,83,91,.1);color:var(--danger);font-size:13.5px;font-weight:600;}
 
   .success{text-align:center;padding:26px 6px 6px;}
@@ -365,6 +406,7 @@
       <div class="price__break">
         основа <span id="base-price">0 ₽</span><br>
         бусины <span id="beads-price">0 ₽</span>
+        <span id="hw-break" hidden><br>фурнитура <span id="hw-price">0 ₽</span></span>
       </div>
     </div>
     <div class="dock__actions">
@@ -397,11 +439,35 @@
 
       <div class="mini"><div class="mini__track" id="mini-track"></div></div>
 
+      <fieldset class="field" id="type-field" hidden>
+        <legend class="field__label">Тип украшения</legend>
+        <div class="segmented" id="type-seg"></div>
+      </fieldset>
+
+      <fieldset class="field" id="size-field" hidden>
+        <legend class="field__label">Размер <i>(обязательно)</i></legend>
+        <div class="chips" id="size-chips"></div>
+        <span class="field__error" data-error-for="size"></span>
+        <p class="size-note" id="size-note" hidden></p>
+      </fieldset>
+
+      <fieldset class="field" id="hw-field" hidden>
+        <legend class="field__label">Фурнитура <i>(необязательно)</i></legend>
+        <div class="hw-tabs" id="hw-tabs" role="tablist"></div>
+        <div class="hw-grid" id="hw-grid"></div>
+        <div class="hw-status">
+          <span id="hw-status">Не выбрана</span>
+          <button type="button" id="hw-clear" hidden>Убрать</button>
+        </div>
+      </fieldset>
+
       <div class="summary">
         <div class="summary__row"><span>Бусин на нити</span><b id="sum-count">0</b></div>
         <div class="summary__row"><span>Длина бусин</span><b id="sum-length">—</b></div>
+        <div class="summary__row"><span>Размер</span><b id="sum-size">—</b></div>
         <div class="summary__row"><span>Основа</span><b id="sum-base">0 ₽</b></div>
         <div class="summary__row"><span>Бусины</span><b id="sum-beads">0 ₽</b></div>
+        <div class="summary__row" id="sum-hw-row" hidden><span id="sum-hw-name">Фурнитура</span><b id="sum-hw">0 ₽</b></div>
         <div class="summary__row summary__row--total"><span>Итого</span><b id="sum-total">0 ₽</b></div>
       </div>
 
@@ -433,7 +499,7 @@
 
       <label class="field">
         <span class="field__label">Комментарий <i>(необязательно)</i></span>
-        <textarea class="field__input" name="comment" rows="2" maxlength="500" placeholder="Размер запястья, пожелания по застёжке…"></textarea>
+        <textarea class="field__input" name="comment" rows="2" maxlength="500" placeholder="Пожелания по сборке…"></textarea>
       </label>
 
       <p class="form-error" id="form-error" role="alert" hidden></p>
@@ -460,7 +526,7 @@
 
   // ---------- Настройки и состояние ----------
   const PX_PER_MM = 5.4;                       // масштаб: 8 мм ≈ 43 px
-  const CFG = { base: 0, max: 30 };            // приходит с сервера (/api/madebar/config)
+  const CFG = { base: 0, max: 30, types: [] }; // приходит с сервера (/api/madebar/config)
   let catalog = {};                            // { категория: [бусины] }
   let beadIndex = new Map();                   // id -> бусина
   let activeCat = null;
@@ -469,6 +535,12 @@
   let lastRemoved = null;                      // для «Вернуть»
   let submitting = false;
   let closeTimer = 0;
+  let jType = '';                              // тип украшения: 'bracelet' | 'necklace'
+  let jSize = null;                            // выбранный размер, см (null = не выбран)
+  let hwCatalog = {};                          // { 'Серебро': [фурнитура], 'Золото': [...] }
+  let hwIndex = new Map();                     // id -> фурнитура
+  let hwCat = null;                            // открытая вкладка фурнитуры
+  let hwSelected = null;                       // выбранная фурнитура или null
 
   // ---------- Элементы ----------
   const $tabs = $('tabs'), $grid = $('bead-grid');
@@ -479,6 +551,11 @@
   const $btnCheckout = $('btn-checkout'), $btnClear = $('btn-clear'), $btnUndo = $('btn-undo');
   const $modal = $('order-modal'), $form = $('order-form'), $success = $('order-success');
   const $formError = $('form-error'), $submit = $('btn-submit'), $addrField = $('address-field');
+  const $typeField = $('type-field'), $typeSeg = $('type-seg');
+  const $sizeField = $('size-field'), $sizeChips = $('size-chips'), $sizeNote = $('size-note');
+  const $hwField = $('hw-field'), $hwTabs = $('hw-tabs'), $hwGrid = $('hw-grid');
+  const $hwStatus = $('hw-status'), $hwClear = $('hw-clear');
+  const $hwBreak = $('hw-break'), $hwPrice = $('hw-price');
   const $toast = $('toast'), $toastText = $('toast-text'), $toastBtn = $('toast-btn');
 
   // ---------- Утилиты ----------
@@ -486,8 +563,48 @@
   const fmtNum = (n) => Number(Number(n).toFixed(2)).toLocaleString('ru-RU');
   const fmtRub = (n) => fmtNum(n) + ' ₽';
   const beadPx = (b) => Math.round(clamp((Number(b.size_mm) || 8) * PX_PER_MM, 16, 84));
+  // --- Цвет бусины на нити ---
+  const NEUTRAL_COLOR = '#d9d4dc';                 // если bead_color не задан или некорректен
+  const HEX6 = /^#[0-9a-f]{6}$/i;
+  const toRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const toHex = (rgb) => '#' + rgb.map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
+  const mix = (rgb, to, k) => rgb.map((v, i) => v + (to[i] - v) * k);
+  function beadColorOf(bead) {
+    const c = String((bead && bead.bead_color) || '').trim();
+    return HEX6.test(c) ? c.toLowerCase() : NEUTRAL_COLOR;
+  }
+  // буква на нити: для нарисованных букв берём её из ссылки /beadart/letter.svg?...&t=А
+  function beadLetterOf(bead) {
+    try {
+      const u = String((bead && bead.image_url) || '');
+      if (!u.startsWith('/beadart/letter.svg')) return '';
+      return (new URL(u, location.origin).searchParams.get('t') || '').slice(0, 2);
+    } catch (e) { return ''; }
+  }
+  // круг нужного цвета: светлый блик, основной тон и тень считаются от одного цвета
+  function makeBeadDot(bead, px) {
+    const base = toRgb(beadColorOf(bead));
+    const lum = (0.299 * base[0] + 0.587 * base[1] + 0.114 * base[2]) / 255;
+    const el = document.createElement('span');
+    el.className = 'bead-dot';
+    el.style.setProperty('--bc', toHex(base));
+    el.style.setProperty('--bc-hi', toHex(mix(base, [255, 255, 255], 0.55)));
+    el.style.setProperty('--bc-lo', toHex(mix(base, [0, 0, 0], 0.22)));
+    el.style.setProperty('--bc-ink', lum > 0.62 ? toHex(mix(base, [0, 0, 0], 0.62)) : '#fff');
+    const letter = beadLetterOf(bead);
+    if (letter) {
+      const b = document.createElement('b');
+      b.textContent = letter;
+      b.style.fontSize = Math.max(8, Math.round(px * 0.5)) + 'px';
+      el.append(b);
+    }
+    return el;
+  }
   const haptic = (kind, type) => { try { tg && tg.HapticFeedback && tg.HapticFeedback[kind](type); } catch (e) {} };
-  const sumPrice = () => Math.round((CFG.base + placed.reduce((s, p) => s + p.bead.price, 0)) * 100) / 100;
+  const hwCost = () => (hwSelected ? Number(hwSelected.price) || 0 : 0);
+  const sumPrice = () => Math.round((CFG.base + placed.reduce((s, p) => s + p.bead.price, 0) + hwCost()) * 100) / 100;
+  const typeById = (id) => CFG.types.find((t) => t.id === id) || null;
+  const sizeLabel = () => { const t = typeById(jType); return t && jSize ? t.label + ', ' + fmtNum(jSize) + ' см' : ''; };
   const sumMm = () => placed.reduce((s, p) => s + (Number(p.bead.size_mm) || 0), 0);
 
   async function getJSON(url) {
@@ -564,15 +681,22 @@
   async function loadCatalog() {
     showSkeleton();
     try {
-      const [cfg, cat] = await Promise.all([getJSON('/api/madebar/config'), getJSON('/api/beads')]);
+      const [cfg, cat, hw] = await Promise.all([
+        getJSON('/api/madebar/config'), getJSON('/api/beads'),
+        getJSON('/api/hardware').catch(() => ({})),     // без фурнитуры конструктор всё равно работает
+      ]);
       CFG.base = Number(cfg.base_price) || 0;
       CFG.max = Number(cfg.max_beads) || 30;
+      CFG.types = Array.isArray(cfg.types) ? cfg.types : [];
       applyCatalog(cat);
+      applyHardware(hw);
     } catch (err) {
       console.error('Не удалось загрузить каталог:', err);
       showGridState('Не удалось загрузить бусины. Проверьте интернет.', true);
       return;
     }
+    renderTypes();
+    renderHardware();
     const cats = Object.keys(catalog);
     if (!cats.length) { showGridState('Бусины скоро появятся. Загляните позже!'); updateUI(); return; }
     renderTabs(cats);
@@ -655,9 +779,7 @@
     el.style.width = el.style.height = px + 'px';
     el.setAttribute('role', 'button');
     el.setAttribute('aria-label', 'Убрать: ' + item.bead.name);
-    const img = document.createElement('img');
-    img.src = item.bead.image_url; img.alt = ''; img.draggable = false; img.decoding = 'async';
-    el.append(img);
+    el.append(makeBeadDot(item.bead, px));
     return el;
   }
 
@@ -666,18 +788,16 @@
   }
 
   // бусина «перелетает» из лотка на нить
-  function flyIn(el, fromImg) {
+  function flyIn(el, fromImg, bead) {
     $scroll.scrollLeft = $scroll.scrollWidth;           // мгновенно к последней бусине
     if (!fromImg || reduceMotion || !el.animate) { el.classList.add('is-new'); return; }
     try {
       const a = fromImg.getBoundingClientRect(), b = el.getBoundingClientRect();
       if (!a.width || !b.width) { el.classList.add('is-new'); return; }
       el.style.visibility = 'hidden';
-      const ghost = document.createElement('img');
-      ghost.src = fromImg.currentSrc || fromImg.src; ghost.alt = '';
-      ghost.style.cssText = 'position:fixed;z-index:90;pointer-events:none;object-fit:contain;transform-origin:center;' +
-        `left:${a.left}px;top:${a.top}px;width:${a.width}px;height:${a.height}px;` +
-        'filter:drop-shadow(0 6px 8px rgba(120,40,70,.35));';
+      const ghost = makeBeadDot(bead, a.width);      // летит круг того же цвета, что ляжет на нить
+      ghost.style.cssText += ';position:fixed;z-index:90;pointer-events:none;transform-origin:center;' +
+        `left:${a.left}px;top:${a.top}px;width:${a.width}px;height:${a.height}px;`;
       document.body.append(ghost);
       const dx = (b.left + b.width / 2) - (a.left + a.width / 2);
       const dy = (b.top + b.height / 2) - (a.top + a.height / 2);
@@ -712,7 +832,7 @@
     lastRemoved = null;
     const el = makeBeadEl(item);
     $track.insertBefore(el, $endR);
-    flyIn(el, fromImg);
+    flyIn(el, fromImg, bead);
     updateUI();
     return true;
   }
@@ -806,6 +926,8 @@
     $length.textContent = n ? '≈ ' + fmtNum(sumMm() / 10) + ' см' : '— см';
     $base.textContent = fmtRub(CFG.base);
     $beadsPrice.textContent = fmtRub(beadsPrice);
+    $hwBreak.hidden = !hwSelected;
+    $hwPrice.textContent = fmtRub(hwCost());
     animateNumber($total, sumPrice());
 
     $empty.hidden = n > 0;
@@ -814,6 +936,114 @@
     $btnClear.disabled = n === 0;
     $btnUndo.disabled = n === 0;
   }
+
+  // ---------- Тип, размер и фурнитура (в окне оформления) ----------
+  function renderTypes() {
+    const hasTypes = CFG.types.length > 0;
+    $typeField.hidden = !hasTypes;
+    $sizeField.hidden = !hasTypes;
+    if (!hasTypes) return;
+    if (!typeById(jType)) jType = CFG.types[0].id;
+    $typeSeg.replaceChildren(...CFG.types.map((t) => {
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio'; input.name = 'jtype'; input.value = t.id; input.checked = t.id === jType;
+      const span = document.createElement('span');
+      span.textContent = t.label;
+      label.append(input, span);
+      return label;
+    }));
+    renderSizes();
+  }
+
+  function renderSizes() {
+    const t = typeById(jType);
+    const sizes = t ? t.sizes : [];
+    if (jSize && !sizes.includes(jSize)) jSize = null;
+    $sizeChips.replaceChildren(...sizes.map((sz) => {
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio'; input.name = 'size'; input.value = sz; input.checked = sz === jSize;
+      const span = document.createElement('span');
+      span.textContent = fmtNum(sz) + ' см';
+      label.append(input, span);
+      return label;
+    }));
+  }
+
+  function applyHardware(h) {
+    hwCatalog = h && typeof h === 'object' ? h : {};
+    hwIndex = new Map();
+    Object.values(hwCatalog).forEach((list) => list.forEach((x) => hwIndex.set(x.id, x)));
+    // позицию могли отключить или поменять цену: берём свежие данные или снимаем выбор
+    if (hwSelected) hwSelected = hwIndex.get(hwSelected.id) || null;
+  }
+
+  function renderHardware() {
+    const cats = Object.keys(hwCatalog);
+    $hwField.hidden = !cats.length;
+    if (!cats.length) { hwCat = null; return; }
+    if (!cats.includes(hwCat)) hwCat = hwSelected && cats.includes(hwSelected.category) ? hwSelected.category : cats[0];
+
+    $hwTabs.replaceChildren(...cats.map((cat) => {
+      const btn = document.createElement('button');
+      btn.className = 'tab'; btn.type = 'button'; btn.setAttribute('role', 'tab');
+      btn.dataset.category = cat; btn.textContent = cat;
+      btn.setAttribute('aria-selected', String(cat === hwCat));
+      return btn;
+    }));
+
+    $hwGrid.replaceChildren(...(hwCatalog[hwCat] || []).map((item) => {
+      const card = document.createElement('button');
+      card.className = 'hw-card'; card.type = 'button'; card.dataset.id = item.id;
+      card.setAttribute('aria-pressed', String(Boolean(hwSelected && hwSelected.id === item.id)));
+
+      const imgWrap = document.createElement('span');
+      imgWrap.className = 'hw-card__img';
+      const img = document.createElement('img');
+      img.src = item.image_url; img.alt = ''; img.draggable = false; img.loading = 'lazy'; img.decoding = 'async';
+      imgWrap.append(img);
+
+      const name = document.createElement('span');
+      name.className = 'hw-card__name'; name.textContent = item.name;
+      const price = document.createElement('span');
+      price.className = 'hw-card__price'; price.textContent = fmtRub(item.price);
+
+      card.append(imgWrap, name, price);
+      return card;
+    }));
+
+    $hwStatus.textContent = hwSelected ? hwSelected.name + ' · ' + fmtRub(hwSelected.price) : 'Не выбрана';
+    $hwClear.hidden = !hwSelected;
+  }
+
+  function updateSizeNote() {
+    const cm = sumMm() / 10;
+    const tooLong = Boolean(jSize) && cm > jSize;
+    $sizeNote.hidden = !tooLong;
+    if (tooLong) {
+      $sizeNote.textContent = 'Бусины занимают ≈ ' + fmtNum(cm) + ' см, это длиннее размера ' + fmtNum(jSize) +
+        ' см. Уберите часть бусин или выберите размер побольше.';
+    }
+  }
+
+  $hwTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('.tab');
+    if (tab && tab.dataset.category !== hwCat) { hwCat = tab.dataset.category; renderHardware(); haptic('selectionChanged'); }
+  });
+  $hwGrid.addEventListener('click', (e) => {
+    const card = e.target.closest('.hw-card');
+    if (!card) return;
+    const item = hwIndex.get(Number(card.dataset.id));
+    if (!item) return;
+    hwSelected = hwSelected && hwSelected.id === item.id ? null : item;   // повторное нажатие снимает выбор
+    renderHardware(); fillSummary(); updateUI();
+    haptic('selectionChanged');
+  });
+  $hwClear.addEventListener('click', () => {
+    hwSelected = null;
+    renderHardware(); fillSummary(); updateUI();
+  });
 
   // ---------- Оформление ----------
   const CONTACT_KEY = 'madebar_contact';
@@ -824,20 +1054,35 @@
 
   const currentDelivery = () => $form.elements.delivery.value;
   function syncDeliveryUI() { $addrField.hidden = currentDelivery() !== 'Доставка'; }
-  $form.addEventListener('change', (e) => { if (e.target.name === 'delivery') syncDeliveryUI(); });
+  $form.addEventListener('change', (e) => {
+    const n = e.target.name;
+    if (n === 'delivery') syncDeliveryUI();
+    else if (n === 'jtype') {          // сменили тип: размеры другие, выбор размера сбрасываем
+      jType = e.target.value; jSize = null;
+      renderSizes(); fillSummary(); haptic('selectionChanged');
+    } else if (n === 'size') {
+      jSize = Number(e.target.value);
+      fillSummary(); haptic('selectionChanged');
+    }
+  });
 
   function fillSummary() {
     const beadsPrice = Math.round(placed.reduce((s, p) => s + p.bead.price, 0) * 100) / 100;
     $('sum-count').textContent = placed.length;
     $('sum-length').textContent = '≈ ' + fmtNum(sumMm() / 10) + ' см';
+    $('sum-size').textContent = sizeLabel() || '—';
     $('sum-base').textContent = fmtRub(CFG.base);
     $('sum-beads').textContent = fmtRub(beadsPrice);
+    $('sum-hw-row').hidden = !hwSelected;
+    $('sum-hw-name').textContent = hwSelected ? 'Фурнитура: ' + hwSelected.name : 'Фурнитура';
+    $('sum-hw').textContent = fmtRub(hwCost());
     $('sum-total').textContent = fmtRub(sumPrice());
+    updateSizeNote();
     $('mini-track').replaceChildren(...placed.map((p) => {
-      const img = document.createElement('img');
       const px = Math.round(beadPx(p.bead) * 0.62);
-      img.src = p.bead.image_url; img.alt = ''; img.width = px; img.height = px;
-      return img;
+      const dot = makeBeadDot(p.bead, px);
+      dot.style.width = dot.style.height = px + 'px';
+      return dot;
     }));
   }
 
@@ -889,6 +1134,7 @@
     if (!d.phone) errors.phone = 'Телефон обязателен';
     else if (digits.length < 10 || digits.length > 15) errors.phone = 'Проверьте номер телефона';
     if (d.delivery === 'Доставка' && d.address.length < 5) errors.address = 'Укажите адрес доставки';
+    if (CFG.types.length && !jSize) errors.size = 'Выберите размер';
     return errors;
   }
   function showErrors(errors) {
@@ -898,12 +1144,16 @@
     }
     const el = $form.elements[Object.keys(errors)[0]];
     if (el && el.focus) el.focus();
+    // поле с ошибкой может быть выше кнопки отправки: прокручиваем к нему
+    const bad = $form.querySelector('.field.is-invalid');
+    if (bad && bad.scrollIntoView) bad.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
   // Сервер отклонил заказ (цены/наличие изменились): подтягиваем свежий каталог и сверяем нить
   async function refreshAfterReject() {
     try {
       applyCatalog(await getJSON('/api/beads'));
+      try { applyHardware(await getJSON('/api/hardware')); renderHardware(); } catch (e) { /* фурнитуру обновим при следующей загрузке */ }
       placed = placed.filter((p) => {
         const fresh = beadIndex.get(p.bead.id);
         if (fresh) p.bead = fresh;
@@ -929,13 +1179,21 @@
       address: f.address.value.trim(), comment: f.comment.value.trim(),
     };
     const errors = validate(d);
-    if (Object.keys(errors).length) { showErrors(errors); haptic('notificationOccurred', 'error'); return; }
+    if (Object.keys(errors).length) {
+      showErrors(errors);
+      if (errors.size) showFormError('Выберите размер украшения: он нужен мастеру для сборки.');
+      haptic('notificationOccurred', 'error');
+      return;
+    }
 
     const payload = {
       customer_name: d.name, customer_phone: d.phone, delivery_type: d.delivery,
       address: d.delivery === 'Доставка' ? d.address : null,
       comment: d.comment || null,
       beads_ids: placed.map((p) => p.bead.id),      // порядок = слева направо
+      jewelry_type: jType || null,
+      size_cm: jSize,
+      hardware_id: hwSelected ? hwSelected.id : null,
       total_price: sumPrice(),
       // чтобы заказ появился в профиле магазина
       tg_user: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user)
@@ -974,6 +1232,8 @@
     haptic('notificationOccurred', 'success');
     // нить очищаем сразу, чтобы заказ нельзя было отправить повторно
     placed = []; lastRemoved = null;
+    jSize = null; hwSelected = null;
+    renderTypes(); renderHardware();
     rebuildThread(); updateUI();
     closeTimer = setTimeout(finish, 3500);
   }

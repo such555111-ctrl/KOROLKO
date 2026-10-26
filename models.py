@@ -64,6 +64,8 @@ class Bead(Base):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Диаметр в миллиметрах: от него зависит размер бусины на нити
     size_mm: Mapped[float] = mapped_column(Float, nullable=False, default=8.0)
+    # Цвет круга, которым бусина рисуется на нити: "#rrggbb" или NULL (нейтральный цвет)
+    bead_color: Mapped[str | None] = mapped_column(String(9), nullable=True)
 
     def to_dict(self) -> dict:
         return {
@@ -75,6 +77,29 @@ class Bead(Base):
             "is_active": self.is_active,
             "sort_order": self.sort_order,
             "size_mm": self.size_mm,
+            "bead_color": self.bead_color,
+        }
+
+
+class Hardware(Base):
+    """Фурнитура (замки, концевики и т. п.): категории «Серебро» и «Золото»."""
+    __tablename__ = "hardware"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    category: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    image_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "image_url": self.image_url,
+            "price": self.price,
+            "is_active": self.is_active,
         }
 
 
@@ -94,6 +119,16 @@ class CustomOrder(Base):
     # Массив ID бусин по порядку слева направо, напр. [3, 7, 7, 12]
     beads_sequence: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     total_price: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    # Тип и размер украшения: «bracelet» / «necklace», размер в сантиметрах
+    # (у старых заказов, оформленных до появления размеров, пусто)
+    jewelry_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    size_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Выбранная фурнитура: название, категория и цена запоминаются в заказе,
+    # чтобы правки каталога фурнитуры не меняли уже оформленные заказы
+    hardware_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    hardware_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    hardware_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    hardware_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="new")  # new / done / cancelled
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
@@ -111,6 +146,12 @@ class CustomOrder(Base):
             "customer_username": self.customer_username,
             "beads_sequence": self.beads_sequence,
             "total_price": self.total_price,
+            "jewelry_type": self.jewelry_type,
+            "size_cm": self.size_cm,
+            "hardware_id": self.hardware_id,
+            "hardware_name": self.hardware_name,
+            "hardware_category": self.hardware_category,
+            "hardware_price": self.hardware_price,
             "status": self.status,
             "created_at": _iso(self.created_at),
         }
@@ -143,18 +184,26 @@ class UploadedFile(Base):
 # Колонки, добавленные позже: create_all их не дописывает в уже
 # существующие таблицы, поэтому дописываем сами (безопасно, идемпотентно).
 _LATE_COLUMNS = {
-    "beads": {"size_mm": "FLOAT DEFAULT 8.0"},
+    "beads": {"size_mm": "FLOAT DEFAULT 8.0", "bead_color": "VARCHAR(9)"},
     "custom_orders": {
         "comment": "TEXT",
         "status": "VARCHAR(20) DEFAULT 'new'",
         "customer_chat_id": "BIGINT",
         "customer_username": "VARCHAR(64)",
+        "jewelry_type": "VARCHAR(20)",
+        "size_cm": "FLOAT",
+        "hardware_id": "INTEGER",
+        "hardware_name": "VARCHAR(120)",
+        "hardware_category": "VARCHAR(20)",
+        "hardware_price": "FLOAT",
     },
 }
 
 
-def _ensure_columns() -> None:
+def _ensure_columns() -> bool:
+    """Дописывает недостающие колонки. Возвращает True, если только что появился beads.bead_color."""
     insp = inspect(engine)
+    color_added = False
     with engine.begin() as conn:
         for table, cols in _LATE_COLUMNS.items():
             have = {c["name"] for c in insp.get_columns(table)}
@@ -162,12 +211,39 @@ def _ensure_columns() -> None:
                 if name not in have:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
                     log.info("Добавлена колонка %s.%s", table, name)
+                    if (table, name) == ("beads", "bead_color"):
+                        color_added = True
+    return color_added
+
+
+def _backfill_bead_colors() -> None:
+    """Один раз после добавления колонки: у нарисованных бусин (/beadart/…?c=9a6bd1)
+    цвет круга берём из ссылки. Бусины с загруженным фото остаются без цвета
+    (на нити они будут нейтральными, пока админ не выберет цвет)."""
+    from urllib.parse import parse_qs, urlparse
+
+    session = SessionLocal()
+    try:
+        rows = session.query(Bead).filter(Bead.bead_color.is_(None)).all()
+        for b in rows:
+            if not (b.image_url or "").startswith("/beadart/"):
+                continue
+            c = (parse_qs(urlparse(b.image_url).query).get("c") or [""])[0].lstrip("#")
+            if len(c) == 6 and all(ch in "0123456789abcdefABCDEF" for ch in c):
+                b.bead_color = "#" + c.lower()
+        session.commit()
+    except Exception:
+        session.rollback()
+        log.exception("Не удалось заполнить bead_color из ссылок картинок")
+    finally:
+        SessionLocal.remove()
 
 
 def init_db() -> None:
     """Создаёт таблицы, если их ещё нет (безопасно вызывать при каждом старте)."""
     Base.metadata.create_all(bind=engine)
-    _ensure_columns()
+    if _ensure_columns():
+        _backfill_bead_colors()
 
 
 if __name__ == "__main__":

@@ -53,17 +53,17 @@ def _rows():
         for name, kind, c, v, price, mm in items:
             n += 1
             yield dict(name=name, category=category, image_url=art_url(kind, c, v),
-                       price=price, size_mm=mm, sort_order=n)
+                       price=price, size_mm=mm, sort_order=n, bead_color="#" + c)
     for ch in CYRILLIC:
         n += 1
         yield dict(name=f"Буква {ch}", category="Буквы",
                    image_url=art_url("letter", "fff4f7", "", ch),
-                   price=30, size_mm=8, sort_order=n)
+                   price=30, size_mm=8, sort_order=n, bead_color="#fff4f7")
     for category, items in (("Разделители", SPACERS), ("Подвески", CHARMS)):
         for name, kind, c, v, price, mm in items:
             n += 1
             yield dict(name=name, category=category, image_url=art_url(kind, c, v),
-                       price=price, size_mm=mm, sort_order=n)
+                       price=price, size_mm=mm, sort_order=n, bead_color="#" + c)
 
 
 def seed_if_empty() -> int:

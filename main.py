@@ -62,8 +62,43 @@ def require_admin():
         abort(401, description="Неверный пароль")
 
 
+def order_products(items):
+    """Возвращает товары в заданном порядке (по sort_order).
+
+    Товары без sort_order (старые записи) сохраняют своё текущее место и
+    остаются перед новыми; при равных значениях порядок стабильный.
+    """
+    def key(pair):
+        idx, p = pair
+        try:
+            so = int(p.get("sort_order"))
+        except (TypeError, ValueError):
+            so = None
+        return (so is None, so if so is not None else 0, idx)
+    return [p for _, p in sorted(enumerate(items), key=key)]
+
+
+def renumber_products(items):
+    """Выставляет sort_order = 1..N по текущему порядку списка."""
+    for i, p in enumerate(items, 1):
+        p["sort_order"] = i
+    return items
+
+
+def move_product(items, product, position):
+    """Ставит товар на позицию position (1..N), остальные сдвигаются."""
+    items = [p for p in items if p is not product]
+    try:
+        pos = int(position)
+    except (TypeError, ValueError):
+        pos = len(items) + 1
+    pos = max(1, min(pos, len(items) + 1))
+    items.insert(pos - 1, product)
+    return renumber_products(items)
+
+
 def load_products():
-    return store.load_doc("products")
+    return order_products(store.load_doc("products"))
 
 
 def save_products(items):
@@ -92,6 +127,49 @@ def load_promos():
 
 def save_promos(items):
     store.save_doc("promos", items)
+
+
+# --- Контакты («Связаться с нами») ----------------------------------------
+
+DEFAULT_CONTACTS = {
+    "telegram": "https://t.me/ANTONINAKOROLKO",
+    "instagram": "https://www.instagram.com/antonina.korolko?rpxt=MW83dG55emcwbWN6&utm_source=qr",
+    "tiktok": "https://www.tiktok.com/@korolko?_r=1&_t=ZS-9ApRVVp66Eu",
+}
+
+
+def normalize_contact(kind, raw):
+    """Приводит ввод (@ник, t.me/ник, ссылка) к https-ссылке. Пустая строка = скрыть кнопку.
+    Бросает ValueError, если ввод не похож на ссылку."""
+    import re
+    v = (raw or "").strip()
+    if not v:
+        return ""
+    hosts = {
+        "telegram": ("t.me", "telegram.me", "telegram.dog"),
+        "instagram": ("instagram.com", "instagr.am"),
+        "tiktok": ("tiktok.com", "vm.tiktok.com", "vt.tiktok.com"),
+    }[kind]
+    base = {"telegram": "https://t.me/", "instagram": "https://www.instagram.com/",
+            "tiktok": "https://www.tiktok.com/@"}[kind]
+    if re.fullmatch(r"@?[A-Za-z0-9._]{2,64}", v):
+        return base + v.lstrip("@")
+    if re.match(r"(?i)^(https?://)?([\w-]+\.)*(" + "|".join(re.escape(h) for h in hosts) + r")(/|$|\?)", v):
+        if not re.match(r"(?i)^https?://", v):
+            v = "https://" + v
+        v = re.sub(r"(?i)^http://", "https://", v)
+        if re.search(r"[\s<>\"']", v) or len(v) > 500:
+            raise ValueError("Некорректная ссылка")
+        return v
+    names = {"telegram": "Telegram", "instagram": "Instagram", "tiktok": "TikTok"}
+    raise ValueError(f"{names[kind]}: введите @ник или ссылку на {hosts[0]}")
+
+
+def load_contacts():
+    saved = store.load_doc("contacts")
+    data = saved[0] if saved and isinstance(saved[0], dict) else {}
+    # ключ есть (даже пустой) — берём сохранённое; нет ключа — значение по умолчанию
+    return {k: (data[k] if k in data else DEFAULT_CONTACTS[k]) for k in DEFAULT_CONTACTS}
 
 
 def fmt_price(n):
@@ -185,6 +263,12 @@ def compute_promo_discount(promo, subtotal):
 
 # --- Telegram handlers -------------------------------------------------
 
+WELCOME_TEXT = (
+    "<b>🍇 Добро пожаловать в KOROLKO!</b>\n"
+    "\n"
+    "Тут вы можете ознакомиться с нашим ассортиментом и оформить заказ💗"
+)
+
 @bot.message_handler(commands=["start"])
 def cmd_start(message: types.Message):
     if not BASE_URL:
@@ -220,12 +304,9 @@ def cmd_start(message: types.Message):
 
     bot.send_message(
         message.chat.id,
-        "👑 *KOROLKO — HandWork jewelry*\n\n"
-        "Добро пожаловать в KOROLKO! Браслеты, брелки и другие авторские "
-        "украшения ручной работы.\n\n"
-        "Нажмите кнопку ниже, чтобы открыть каталог товаров, проверить наличие и оформить заказ.",
+        WELCOME_TEXT,
         reply_markup=keyboard,
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
 
@@ -245,6 +326,13 @@ def index():
 @app.route("/products.json", methods=["GET"])
 def products():
     resp = jsonify(load_products())
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.route("/api/contacts", methods=["GET"])
+def public_contacts():
+    resp = jsonify(load_contacts())
     resp.headers["Cache-Control"] = "no-cache"
     return resp
 
@@ -568,7 +656,13 @@ def admin_create_product():
         "images": images,
         "image": images[0] if images else None,
     }
+    # Новый товар по умолчанию встаёт в конец — текущий порядок не ломается.
+    # Если админ указал позицию, вставляем товар на неё.
     items.append(product)
+    raw_pos = data.get("sort_order")
+    if raw_pos in (None, ""):
+        raw_pos = len(items)
+    items = move_product(items, product, raw_pos)
     save_products(items)
     return jsonify(product), 201
 
@@ -608,9 +702,37 @@ def admin_update_product(pid):
                 images = sanitize_images(data.get("image"))
                 p["images"] = images
                 p["image"] = images[0] if images else None
+            if data.get("sort_order") not in (None, ""):
+                items = move_product(items, p, data.get("sort_order"))
+            else:
+                items = renumber_products(items)
             save_products(items)
             return jsonify(p)
     abort(404, description="Товар не найден")
+
+
+@app.route("/api/admin/products/<int:pid>/move", methods=["POST"])
+def admin_move_product(pid):
+    """Кнопки «выше / ниже» (up / down), а также top / bottom."""
+    require_admin()
+    data = request.get_json(force=True, silent=True) or {}
+    direction = data.get("direction")
+    if direction not in ("up", "down", "top", "bottom"):
+        abort(400, description="Неверное направление")
+    items = load_products()
+    idx = next((i for i, p in enumerate(items) if p.get("id") == pid), None)
+    if idx is None:
+        abort(404, description="Товар не найден")
+    target = {
+        "up": max(0, idx - 1),
+        "down": min(len(items) - 1, idx + 1),
+        "top": 0,
+        "bottom": len(items) - 1,
+    }[direction]
+    items.insert(target, items.pop(idx))
+    renumber_products(items)
+    save_products(items)
+    return jsonify(items)
 
 
 @app.route("/api/admin/products/<int:pid>", methods=["DELETE"])
@@ -620,7 +742,7 @@ def admin_delete_product(pid):
     new_items = [p for p in items if p.get("id") != pid]
     if len(new_items) == len(items):
         abort(404, description="Товар не найден")
-    save_products(new_items)
+    save_products(renumber_products(new_items))
     return jsonify({"ok": True})
 
 
@@ -639,6 +761,26 @@ def admin_upload():
         f.write(data)
     store.save_upload(filename, data, IMAGE_MIME.get(ext, "application/octet-stream"))
     return jsonify({"url": f"/uploads/{filename}"}), 201
+
+
+@app.route("/api/admin/contacts", methods=["GET"])
+def admin_get_contacts():
+    require_admin()
+    return jsonify(load_contacts())
+
+
+@app.route("/api/admin/contacts", methods=["PUT"])
+def admin_put_contacts():
+    require_admin()
+    body = request.get_json(silent=True) or {}
+    result = {}
+    for kind in DEFAULT_CONTACTS:
+        try:
+            result[kind] = normalize_contact(kind, body.get(kind, ""))
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+    store.save_doc("contacts", [result])
+    return jsonify(result)
 
 
 @app.route("/api/admin/promos", methods=["GET"])
