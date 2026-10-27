@@ -18,7 +18,8 @@ log = logging.getLogger("korolko.beadbar")
 
 bead_bp = Blueprint("bead_api", __name__)
 
-ALLOWED_DELIVERY = {"Доставка", "Самовывоз"}
+# Самовывоза нет: всегда доставка, а в поле address хранится только город доставки
+DELIVERY_TYPE = "Доставка"
 PRICE_TOLERANCE = 0.01   # допустимое расхождение цены клиента и сервера
 
 _bot = None
@@ -92,18 +93,12 @@ def _validate_order(data: dict):
     if not phone:
         return None, "Некорректный номер телефона"
 
-    delivery = str(data.get("delivery_type") or "").strip()
-    if delivery not in ALLOWED_DELIVERY:
-        return None, "delivery_type должен быть «Доставка» или «Самовывоз»"
-
-    address = str(data.get("address") or "").strip() or None
-    if delivery == "Доставка":
-        if not address or len(address) < 5:
-            return None, "Для доставки нужно указать адрес"
-    else:
-        address = None
-    if address and len(address) > 500:
-        return None, "Адрес слишком длинный"
+    delivery = DELIVERY_TYPE
+    address = str(data.get("address") or "").strip()
+    if len(address) < 2:
+        return None, "Укажите город доставки"
+    if len(address) > 100:
+        return None, "Название города слишком длинное"
 
     comment = str(data.get("comment") or "").strip() or None
     if comment and len(comment) > 500:
@@ -180,7 +175,7 @@ def _build_recipe(order: CustomOrder, beads_by_id: dict) -> str:
         f"🚚 {esc(order.delivery_type)}",
     ]
     if order.address:
-        lines.append(f"📍 {esc(order.address)}")
+        lines.append(f"📍 Город: {esc(order.address)}")
     if order.comment:
         lines.append(f"💬 {esc(order.comment)}")
     if order.customer_username:

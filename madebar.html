@@ -483,17 +483,9 @@
         <span class="field__error" data-error-for="phone"></span>
       </label>
 
-      <fieldset class="field">
-        <legend class="field__label">Способ получения</legend>
-        <div class="segmented">
-          <label><input type="radio" name="delivery" value="Доставка" checked><span>Доставка</span></label>
-          <label><input type="radio" name="delivery" value="Самовывоз"><span>Самовывоз</span></label>
-        </div>
-      </fieldset>
-
       <label class="field" id="address-field">
-        <span class="field__label">Адрес доставки</span>
-        <textarea class="field__input" name="address" rows="2" maxlength="500" autocomplete="street-address" placeholder="Город, улица, дом, квартира"></textarea>
+        <span class="field__label">Город доставки</span>
+        <input class="field__input" name="address" type="text" maxlength="100" autocomplete="address-level2" placeholder="Например, Москва">
         <span class="field__error" data-error-for="address"></span>
       </label>
 
@@ -1049,15 +1041,14 @@
   const CONTACT_KEY = 'madebar_contact';
   const loadContact = () => { try { return JSON.parse(localStorage.getItem(CONTACT_KEY)) || {}; } catch (e) { return {}; } };
   const saveContact = (d) => {
-    try { localStorage.setItem(CONTACT_KEY, JSON.stringify({ name: d.name, phone: d.phone, delivery: d.delivery, address: d.address })); } catch (e) {}
+    try { localStorage.setItem(CONTACT_KEY, JSON.stringify({ name: d.name, phone: d.phone, address: d.address })); } catch (e) {}
   };
 
-  const currentDelivery = () => $form.elements.delivery.value;
-  function syncDeliveryUI() { $addrField.hidden = currentDelivery() !== 'Доставка'; }
+  // Самовывоза нет: заказ всегда с доставкой, вместо адреса — только город
+  const DELIVERY = 'Доставка';
   $form.addEventListener('change', (e) => {
     const n = e.target.name;
-    if (n === 'delivery') syncDeliveryUI();
-    else if (n === 'jtype') {          // сменили тип: размеры другие, выбор размера сбрасываем
+    if (n === 'jtype') {          // сменили тип: размеры другие, выбор размера сбрасываем
       jType = e.target.value; jSize = null;
       renderSizes(); fillSummary(); haptic('selectionChanged');
     } else if (n === 'size') {
@@ -1100,8 +1091,7 @@
     if (!f.name.value) f.name.value = saved.name || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || '';
     if (!f.phone.value && saved.phone) f.phone.value = saved.phone;
     if (!f.address.value && saved.address) f.address.value = saved.address;
-    if (saved.delivery) { const r = $form.querySelector(`input[name="delivery"][value="${saved.delivery}"]`); if (r) r.checked = true; }
-    fillSummary(); clearErrors(); syncDeliveryUI();
+    fillSummary(); clearErrors();
     $form.hidden = false; $success.hidden = true;
     $modal.hidden = false;
     document.body.classList.add('modal-open');
@@ -1133,7 +1123,7 @@
     const digits = d.phone.replace(/\D/g, '');
     if (!d.phone) errors.phone = 'Телефон обязателен';
     else if (digits.length < 10 || digits.length > 15) errors.phone = 'Проверьте номер телефона';
-    if (d.delivery === 'Доставка' && d.address.length < 5) errors.address = 'Укажите адрес доставки';
+    if (d.address.length < 2) errors.address = 'Укажите город доставки';
     if (CFG.types.length && !jSize) errors.size = 'Выберите размер';
     return errors;
   }
@@ -1175,7 +1165,7 @@
 
     const f = $form.elements;
     const d = {
-      name: f.name.value.trim(), phone: f.phone.value.trim(), delivery: currentDelivery(),
+      name: f.name.value.trim(), phone: f.phone.value.trim(),
       address: f.address.value.trim(), comment: f.comment.value.trim(),
     };
     const errors = validate(d);
@@ -1187,8 +1177,8 @@
     }
 
     const payload = {
-      customer_name: d.name, customer_phone: d.phone, delivery_type: d.delivery,
-      address: d.delivery === 'Доставка' ? d.address : null,
+      customer_name: d.name, customer_phone: d.phone, delivery_type: DELIVERY,
+      address: d.address,
       comment: d.comment || null,
       beads_ids: placed.map((p) => p.bead.id),      // порядок = слева направо
       jewelry_type: jType || null,
